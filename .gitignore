@@ -1,0 +1,6 @@
+.env
+storage/
+worklists/*.wl
+__pycache__/
+worklists/
+*.dcm

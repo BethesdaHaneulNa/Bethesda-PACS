@@ -1,0 +1,37 @@
+Bethesda PACS — License
+
+Copyright (c) 2026 Bethesda EMR project (sponsored by the church
+"행복한 섬김의 열매 / Fruit of Joyful Devotion", for Bethesda Hospital, Madagascar).
+
+This license covers ONLY the original code in this repository (the worklist
+bridge, the docker-compose configuration, the setup scripts, and the docs).
+It does NOT cover Orthanc, which is a separate program by other authors,
+pulled as an official Docker image and licensed under the GNU AGPLv3. This
+project uses Orthanc as-is (unmodified) and does not distribute it.
+
+For OUR code in this repository — non-profit, source-available:
+
+You ARE permitted to:
+  1. Use it, free of charge, including in a hospital or clinic.
+  2. Modify it for your own use and adapt it to your own facility.
+  3. Run it on your own servers/computers for your own operations.
+
+You are NOT permitted to:
+  1. Redistribute it or any modified version — that is, you may not republish,
+     repackage, mirror, sell, sublicense, or hand it out to others, whether
+     under this name or another name.
+  2. Remove or misrepresent this notice or the project's origin.
+
+If you would like to use this software in a way the terms above do not cover,
+please contact the project first.
+
+Attribution:
+  This software was developed through "vibe coding" with Claude
+  (Anthropic's Claude / Claude Code).
+
+NO WARRANTY:
+  This software is provided "as is", without warranty of any kind. In no event
+  shall the authors or sponsors be liable for any claim, damages, or other
+  liability arising from its use. It is the deployer's responsibility to ensure
+  the system is configured safely (secrets, network security) and used in
+  compliance with local laws and medical-data regulations.
