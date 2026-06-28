@@ -127,6 +127,13 @@ before connecting real equipment.
 - The bridge token is random and must match the EMR's setting.
 - Keep ports `8090` / `4242` on the LAN only. Use a VPN for any remote access.
 
+## Questions & feature requests
+
+Please open an **Issue** on this repository (or on the main
+[Bethesda EMR](https://github.com/BethesdaHaneulNa/Bethesda-EMR) repo).
+
+문의·기능 요청은 이 저장소에 **Issue**를 남겨주세요.
+
 ## License
 
 - **Our code** (the worklist bridge, compose, scripts, docs) is **source-available**: use and
