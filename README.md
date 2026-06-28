@@ -58,14 +58,15 @@ authors under its own (AGPLv3) license — see **License** below.
 
 ## Quick start
 
-Requires **Docker**. Run the EMR first, then:
+Requires **Docker**. Set up the EMR first, then:
 
+**Easy way (Windows):** download this repo as a ZIP (**`Code ▾` → Download ZIP**), unzip, and
+double-click **`start.bat`**.
+
+**Command line (Linux / macOS / NAS, or if you prefer):**
 ```bash
-# Windows (PowerShell)
-./setup.ps1
-
-# Linux / macOS / NAS
-./setup.sh
+./setup.sh      # Linux / macOS / NAS
+.\setup.ps1     # Windows PowerShell
 ```
 
 The setup script generates a `.env` with a **random Orthanc password** and a **random bridge

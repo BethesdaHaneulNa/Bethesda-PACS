@@ -1,3 +1,6 @@
+# Fixed project name so re-downloading a newer version keeps your existing images/index.
+name: bethesda-pacs
+
 services:
   orthanc:
     image: orthancteam/orthanc:latest
