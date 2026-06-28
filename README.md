@@ -121,6 +121,41 @@ before connecting real equipment.
 
 ---
 
+## Troubleshooting
+
+**The EMR's "PACS connection test (DICOM)" shows a red ✗ when Host is `localhost`.**
+
+This is expected — not a bug. That test runs from *inside the EMR's container*, and inside a
+container `localhost` means the container itself, **not your PC**. So it can't reach Orthanc's
+port `4242` on its own loopback.
+
+Fix — in the EMR, open **Settings → Order Feed → PACS server → Host / IP** and change
+`localhost` to:
+
+```
+host.docker.internal
+```
+
+That means "the host machine, as seen from inside a container" (works on Docker Desktop). Click
+**Save** and test again — it should turn green. On a NAS / Linux host, or to reach it from other
+PCs and imaging devices, use the host's **LAN IP** instead (e.g. `192.168.0.55`), which works
+from both the container and a browser.
+
+Note: the **PACS web/viewer URL stays `http://localhost:8090`** — that one is opened by your
+*browser* (where `localhost` = your PC), so it's correct as-is. The two fields legitimately take
+different values.
+
+Also: this DICOM test is only a convenience check. The imaging integration actually works through
+the **bridge token** (worklist feed) and the **viewer URL**, so a red ✗ here does **not** stop the
+worklist or image viewing from working.
+
+> 한국어 — 연결 테스트가 빨간 ✗ 뜨면: Host/IP를 `localhost` 대신 **`host.docker.internal`**
+> (또는 이 PC의 **LAN IP**)로 바꾸세요. 컨테이너 안에서 `localhost`는 PC가 아니라 컨테이너
+> 자기 자신을 가리켜서 그래요. **뷰어 주소(`localhost:8090`)는 브라우저가 여는 거라 그대로** 두면
+> 됩니다. 이 테스트는 확인용이라 ✗여도 워크리스트·뷰어 기능 자체는 동작해요.
+
+---
+
 ## Security
 
 - The Orthanc admin password is **randomly generated** by setup (in `.env`, git-ignored). Login: user `admin`.
