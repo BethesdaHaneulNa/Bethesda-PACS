@@ -19,6 +19,36 @@ POLL     = int(os.environ.get("POLL_SECONDS", "15"))
 
 MWL_SOP_CLASS = "1.2.840.10008.5.1.4.31"  # Modality Worklist Information Model - FIND
 
+# Where we say "still here" after every cycle.
+#  - the file is read by the container healthcheck and keeps working when the
+#    EMR is unreachable, which is precisely when we most want to know whether
+#    this process is alive or wedged;
+#  - the POST puts the same news on the EMR's own screen, because a clinic in
+#    Madagascar is not going to be reading container logs.
+# Neither is allowed to interrupt the sync loop.
+HEARTBEAT_URL  = FEED_URL.replace("/worklist-feed", "/bridge-heartbeat")
+HEARTBEAT_FILE = os.path.join(WL_DIR, ".heartbeat")
+
+
+def report(ok, synced=0, failed=0, error=""):
+    try:
+        with open(HEARTBEAT_FILE, "w") as f:
+            f.write(str(int(time.time())))
+    except Exception as ex:
+        print("bridge: could not write heartbeat file:", ex, flush=True)
+    try:
+        requests.post(HEARTBEAT_URL, timeout=5, json={
+            "token": TOKEN,
+            "ok": bool(ok),
+            "synced": synced,
+            "failed": failed,
+            "error": str(error)[:500],
+            "poll_seconds": POLL,
+        })
+    except Exception:
+        # The EMR being down is already its own alarm; do not add noise here.
+        pass
+
 
 def safe(name):
     return "".join(c for c in str(name) if c.isalnum() or c in "-_.")
@@ -101,8 +131,10 @@ def main():
             if failed:
                 msg += " (%d skipped -- see errors above)" % failed
             print(msg, flush=True)
+            report(True, synced=n, failed=failed)
         except Exception as ex:
             print("bridge error:", ex, flush=True)
+            report(False, error=ex)
         time.sleep(POLL)
 
 

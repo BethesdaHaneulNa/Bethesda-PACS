@@ -38,6 +38,15 @@ services:
     volumes:
       - ./storage:/var/lib/orthanc/db          # DICOM images + index (persist)
       - ./worklists:/var/lib/orthanc/worklists # .wl worklist files written by the EMR bridge
+    # Ask Orthanc's own REST API rather than trusting that the process is still
+    # running. /system needs a login, so 401 is a perfectly good answer here: it
+    # proves the server is listening and serving, which is the question.
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import http.client,sys; c=http.client.HTTPConnection('127.0.0.1',8042,timeout=5); c.request('GET','/system'); sys.exit(0 if c.getresponse().status in (200,401) else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # EMR → worklist bridge: polls the EMR MWL feed and writes .wl files for Orthanc
   worklist-bridge:
@@ -53,3 +62,12 @@ services:
       - ./worklists:/worklists
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # The bridge has no port to knock on, so it leaves a timestamp after every
+    # cycle instead. A stale timestamp means the loop is wedged -- which used to
+    # be invisible, because a wedged bridge still looks like a running container.
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,sys,time; p='/worklists/.heartbeat'; sys.exit(0 if os.path.exists(p) and time.time()-float(open(p).read()) < 60 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 2
+      start_period: 30s
