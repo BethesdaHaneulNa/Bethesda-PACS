@@ -52,7 +52,12 @@ def write_wl(row, path):
 
     ds.is_little_endian = True
     ds.is_implicit_VR = False
-    ds.save_as(path, write_like_original=False)
+    # Write beside the target and rename into place. Orthanc scans this directory
+    # on its own schedule, so saving straight to `path` lets it pick up a file
+    # that is still half written; os.replace is atomic on the same filesystem.
+    tmp = path + ".tmp"
+    ds.save_as(tmp, write_like_original=False)
+    os.replace(tmp, path)
 
 
 def sync():
@@ -62,18 +67,28 @@ def sync():
     rows = data.get("rows", []) if isinstance(data, dict) else (data or [])
 
     current = set()
+    failed = 0
     for row in rows:
         key = safe(row.get("accession_no") or row.get("study_instance_uid") or "")
         if not key:
             continue
+        # Claim the name before attempting the write, so that a row we cannot
+        # convert does not also get its last good worklist file swept below.
         current.add(key)
-        write_wl(row, os.path.join(WL_DIR, key + ".wl"))
+        try:
+            write_wl(row, os.path.join(WL_DIR, key + ".wl"))
+        except Exception as ex:
+            # One unconvertible order used to abort the whole cycle, which meant
+            # every patient after it in the list silently lost their worklist
+            # entry -- and the next cycle failed in the same place, forever.
+            failed += 1
+            print("bridge: skipped order %s: %s" % (key, ex), flush=True)
 
     # drop worklist files no longer scheduled (completed / cancelled / past day)
     for f in os.listdir(WL_DIR):
         if f.endswith(".wl") and f[:-3] not in current:
             os.remove(os.path.join(WL_DIR, f))
-    return len(current)
+    return len(current) - failed, failed
 
 
 def main():
@@ -81,8 +96,11 @@ def main():
     print("worklist-bridge: feed=%s poll=%ss dir=%s" % (FEED_URL, POLL, WL_DIR), flush=True)
     while True:
         try:
-            n = sync()
-            print("synced %d worklist entr%s" % (n, "y" if n == 1 else "ies"), flush=True)
+            n, failed = sync()
+            msg = "synced %d worklist entr%s" % (n, "y" if n == 1 else "ies")
+            if failed:
+                msg += " (%d skipped -- see errors above)" % failed
+            print(msg, flush=True)
         except Exception as ex:
             print("bridge error:", ex, flush=True)
         time.sleep(POLL)
