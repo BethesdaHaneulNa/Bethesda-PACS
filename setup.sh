@@ -23,7 +23,7 @@ if [ ! -f .env ]; then
     echo "# Worklist bridge -> EMR. BRIDGE_TOKEN must match the EMR's"
     echo "# Settings -> Order Feed -> Bridge Token (paste the value printed below)."
     echo "BRIDGE_TOKEN=$BRIDGE_TOKEN"
-    echo "# EMR_FEED_URL=http://host.docker.internal:8080/api/pacs/worklist-feed"
+    echo "# EMR_FEED_URL=http://host.docker.internal:9080/api/pacs/worklist-feed"
   } > .env
   echo ".env created. Orthanc login: user 'admin', password is in .env (ORTHANC_PASSWORD)."
 else
@@ -33,7 +33,7 @@ fi
 docker compose up -d
 
 echo ""
-echo "Bethesda PACS (Orthanc) is starting at http://localhost:8090"
+echo "Bethesda PACS (Orthanc) is starting at http://localhost:9090"
 echo "Login with user 'admin' and the ORTHANC_PASSWORD value in .env"
 if [ -n "$BRIDGE_TOKEN" ]; then
   echo ""

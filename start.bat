@@ -37,12 +37,12 @@ if errorlevel 1 (
 color 0A
 echo.
 echo ==================================================
-echo    Bethesda PACS is running:  http://localhost:8090
+echo    Bethesda PACS is running:  http://localhost:9090
 echo.
 echo    IMPORTANT - pair it with the EMR (one time):
 echo    copy the Bridge Token shown ABOVE, then in the EMR open
 echo    Settings -^> Order Feed -^> Bridge Token and paste it there.
-echo    Also set the PACS viewer URL to  http://localhost:8090
+echo    Also set the PACS viewer URL to  http://localhost:9090
 echo ==================================================
 echo.
 pause

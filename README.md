@@ -23,6 +23,13 @@ contains:
 When you run it, Docker downloads Orthanc automatically. Orthanc remains the property of its
 authors under its own (AGPLv3) license — see **License** below.
 
+The Orthanc image is **pinned to a specific version** (currently `26.6.1`) rather than `:latest`.
+With `:latest`, a clinic that reboots months from now can silently land on a newer Orthanc whose
+configuration keys or database layout have changed — the PACS stops working, nobody touched
+anything, and there may be no one on site who can diagnose it. Pinning means the version you
+tested is the version that runs. To upgrade, bump the tag in `docker-compose.yml` deliberately,
+test it, and keep the old number handy so you can roll back.
+
 ---
 
 ## How it works
@@ -30,12 +37,12 @@ authors under its own (AGPLv3) license — see **License** below.
 ```
    ┌─────────────┐   imaging orders (JSON feed)   ┌──────────────────┐
    │  Bethesda   │ ─────────────────────────────► │ worklist-bridge  │  (our code)
-   │  EMR :8080  │   /api/pacs/worklist-feed       │  polls every 15s │
+   │  EMR :9080  │   /api/pacs/worklist-feed       │  polls every 15s │
    └─────┬───────┘                                 └────────┬─────────┘
          │  viewer (iframe)                                  │ writes .wl files
          │                                                   ▼
          │                                          ┌──────────────────┐
-         └────────────────── view images ──────────►│  Orthanc :8090   │  (official image)
+         └────────────────── view images ──────────►│  Orthanc :9090   │  (official image)
                                                      │  DICOM    :4242  │
                                                      └────────┬─────────┘
                                           worklist query ▲    │ store images (C-STORE)
@@ -76,7 +83,7 @@ token**, then starts Orthanc + the bridge. It prints the bridge token at the end
 
 1. In the EMR, open **Settings → Order Feed**.
 2. Set **Bridge Token** to the value the setup script printed (so the two trust each other).
-3. Set **PACS web / viewer URL** to `http://<this-host-ip>:8090` so the EMR can show images.
+3. Set **PACS web / viewer URL** to `http://<this-host-ip>:9090` so the EMR can show images.
 
 That's it — orders placed in the EMR now appear on your imaging devices, and images come back
 into the EMR.
@@ -106,11 +113,38 @@ accept queries and images from any sender. The image is matched to the EMR order
 
 | Port | Purpose | Who needs it |
 |------|---------|--------------|
-| 8090 | Orthanc web UI / viewer / REST / DICOMweb | clinic computers + the EMR host |
+| 9090 | Orthanc web UI / viewer / REST / DICOMweb | clinic computers + the EMR host |
 | 4242 | DICOM (worklist query + image store) | imaging devices |
 
 Keep these on the clinic LAN — **do not expose them to the internet.** Orthanc holds patient
 images (PII).
+
+### Windows: PACS won't start, or the viewer never loads
+Windows (Hyper-V/WSL) reserves blocks of TCP ports for itself, and the blocks change on every
+reboot. If a port you publish lands inside one of them, Docker can't bind it. You'll either get
+
+```
+bind: An attempt was made to access a socket in a way forbidden by its access permissions
+```
+
+or — worse — the container reports `Up` while nothing is actually listening on the host, so the
+viewer just times out with no visible error anywhere.
+
+This PACS used to publish **8090**, which sits inside a range Windows frequently reserves (we hit
+`8013–8112` in practice). It now uses **9090**, outside those ranges. To inspect the reserved
+ranges on a Windows host:
+
+```
+netsh interface ipv4 show excludedportrange protocol=tcp
+```
+
+If a port you need is listed, change it in `docker-compose.yml` rather than fighting Windows for
+it. Linux hosts don't have this problem.
+
+> 한국어 — Windows에서 PACS가 안 뜨거나 뷰어가 안 열리면 포트 충돌일 수 있어요. Windows가
+> 재부팅할 때마다 임의의 포트 대역을 예약해버리는데, 거기 걸리면 Docker가 포트를 못 잡습니다.
+> 컨테이너는 `Up`으로 보이는데 접속만 안 되는 경우가 있어 원인 찾기가 어려워요. 위 `netsh`
+> 명령으로 예약된 대역을 확인하고, 겹치면 `docker-compose.yml`에서 포트를 바꾸세요.
 
 ## Test tools (optional)
 
@@ -141,7 +175,7 @@ That means "the host machine, as seen from inside a container" (works on Docker 
 PCs and imaging devices, use the host's **LAN IP** instead (e.g. `192.168.0.55`), which works
 from both the container and a browser.
 
-Note: the **PACS web/viewer URL stays `http://localhost:8090`** — that one is opened by your
+Note: the **PACS web/viewer URL stays `http://localhost:9090`** — that one is opened by your
 *browser* (where `localhost` = your PC), so it's correct as-is. The two fields legitimately take
 different values.
 
@@ -151,7 +185,7 @@ worklist or image viewing from working.
 
 > 한국어 — 연결 테스트가 빨간 ✗ 뜨면: Host/IP를 `localhost` 대신 **`host.docker.internal`**
 > (또는 이 PC의 **LAN IP**)로 바꾸세요. 컨테이너 안에서 `localhost`는 PC가 아니라 컨테이너
-> 자기 자신을 가리켜서 그래요. **뷰어 주소(`localhost:8090`)는 브라우저가 여는 거라 그대로** 두면
+> 자기 자신을 가리켜서 그래요. **뷰어 주소(`localhost:9090`)는 브라우저가 여는 거라 그대로** 두면
 > 됩니다. 이 테스트는 확인용이라 ✗여도 워크리스트·뷰어 기능 자체는 동작해요.
 
 ---
@@ -160,7 +194,7 @@ worklist or image viewing from working.
 
 - The Orthanc admin password is **randomly generated** by setup (in `.env`, git-ignored). Login: user `admin`.
 - The bridge token is random and must match the EMR's setting.
-- Keep ports `8090` / `4242` on the LAN only. Use a VPN for any remote access.
+- Keep ports `9090` / `4242` on the LAN only. Use a VPN for any remote access.
 
 ## Questions & feature requests
 
