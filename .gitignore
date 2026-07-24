@@ -4,3 +4,8 @@ worklists/*.wl
 __pycache__/
 worklists/
 *.dcm
+
+# Offline install kit (built by the EMR project's offline/pack.ps1) - multi-GB
+# image tarballs, and it bundles GPL/AGPL third-party images. Never commit it.
+bethesda-offline-kit/
+*.tar

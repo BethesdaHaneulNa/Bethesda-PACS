@@ -51,6 +51,9 @@ services:
   # EMR → worklist bridge: polls the EMR MWL feed and writes .wl files for Orthanc
   worklist-bridge:
     build: ./bridge
+    # Named so the offline install kit can `docker save` it — see the EMR's
+    # OFFLINE-INSTALL.md. Compose picks this name implicitly anyway.
+    image: bethesda-pacs-worklist-bridge:latest
     container_name: bethesda-worklist-bridge
     restart: unless-stopped
     environment:

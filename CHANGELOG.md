@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.0.2 — 2026-07-24
+
+**Can be installed with no internet.** The worklist bridge image now has a name
+of its own (`bethesda-pacs-worklist-bridge`) instead of relying on the one
+Compose invents, which is what lets `docker save` pick it up — and `setup`
+learned an `-Offline` / `--offline` flag that starts from pre-loaded images
+without building. Orthanc is a 2 GB pull, so a clinic on a slow link had little
+chance of installing imaging at all.
+
+Pack it alongside the EMR with that project's `offline/pack.ps1`; see
+**[Bethesda EMR v1.3.0](https://github.com/BethesdaHaneulNa/Bethesda-EMR/releases/tag/v1.3.0)**
+and its `OFFLINE-INSTALL.md`.
+
 ## v1.0.1 — 2026-07-23
 
 **The bridge now says it is still there.** It could stop or wedge and the only
