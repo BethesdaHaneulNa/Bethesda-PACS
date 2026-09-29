@@ -63,6 +63,11 @@ services:
       BRIDGE_TOKEN: "${BRIDGE_TOKEN:-}"
       WL_DIR: "/worklists"
       POLL_SECONDS: "15"
+      # To see which scheduled studies have arrived, so finished patients leave
+      # the device worklist. Same login as the web viewer (Orthanc has one user).
+      ORTHANC_URL: "http://orthanc:8042"
+      ORTHANC_USER: "admin"
+      ORTHANC_PASSWORD: "${ORTHANC_PASSWORD:-}"
     volumes:
       - ./worklists:/worklists
     extra_hosts:

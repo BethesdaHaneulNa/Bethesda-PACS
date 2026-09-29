@@ -39,6 +39,20 @@ AUTH = {"X-Bridge-Token": TOKEN}
 PLACEHOLDER_TOKENS = ("change-me-bridge-token",)
 MIN_TOKEN_LENGTH = 16
 
+# Orthanc, to see whether a scheduled study has actually been taken. Without
+# this an entry stayed on the device all day after the patient had gone, next to
+# the ones still waiting -- more rows to pick the wrong patient from -- and the
+# EMR could not tell "no images yet" from "images are here". Same compose
+# network, so the service name resolves; no password means the check is off.
+ORTHANC_URL      = os.environ.get("ORTHANC_URL", "http://orthanc:8042").rstrip("/")
+ORTHANC_USER     = os.environ.get("ORTHANC_USER", "admin")
+ORTHANC_PASSWORD = os.environ.get("ORTHANC_PASSWORD", "")
+ARRIVED_URL      = FEED_URL.replace("/worklist-feed", "/study-arrived")
+
+# An EMR from before /study-arrived answers 404. Stop asking until restart
+# rather than log the same line every cycle.
+arrival_unsupported = False
+
 
 def report(ok, synced=0, failed=0, error=""):
     try:
@@ -99,6 +113,77 @@ def write_wl(row, path):
     os.replace(tmp, path)
 
 
+def find_stable_study(uid):
+    """The Orthanc study with this StudyInstanceUID once it has stopped growing,
+    else None. "Stable" is Orthanc's own call (no new instance for StableAge,
+    60 s by default): reporting on the first image would take the entry off the
+    worklist while a multi-image exam is still being sent."""
+    auth = (ORTHANC_USER, ORTHANC_PASSWORD)
+    r = requests.post(ORTHANC_URL + "/tools/find", auth=auth, timeout=10,
+                      json={"Level": "Study", "Query": {"StudyInstanceUID": uid}, "Expand": True})
+    r.raise_for_status()
+    found = r.json()
+    if not found or not found[0].get("IsStable"):
+        return None
+    study = found[0]
+    stats = requests.get(ORTHANC_URL + "/studies/%s/statistics" % study["ID"], auth=auth, timeout=10)
+    stats.raise_for_status()
+    study["_instances"] = int(stats.json().get("CountInstances", 0))
+    return study
+
+
+def report_arrivals(rows):
+    """Tell the EMR about every scheduled study that is now in Orthanc. The EMR
+    marks the entry completed, so the next feed leaves it out and its .wl file is
+    swept. Failures here never stop the worklist itself from syncing."""
+    global arrival_unsupported
+    if not ORTHANC_PASSWORD or arrival_unsupported:
+        return 0
+    reported = 0
+    for row in rows:
+        uid = row.get("study_instance_uid")
+        if not uid or not row.get("worklist_id"):
+            continue
+        try:
+            study = find_stable_study(uid)
+        except Exception as ex:
+            # Orthanc down or the password wrong: every other row would fail
+            # the same way, so say it once and try again next cycle.
+            print("bridge: could not ask Orthanc about studies:", ex, flush=True)
+            return reported
+        if not study:
+            continue
+        tags = study.get("PatientMainDicomTags") or {}
+        try:
+            r = requests.post(ARRIVED_URL, headers=AUTH, timeout=10, json={
+                "worklist_id": row["worklist_id"],
+                "study_instance_uid": uid,
+                "orthanc_study_id": study.get("ID", ""),
+                "patient_id": tags.get("PatientID", ""),
+                "patient_name": tags.get("PatientName", ""),
+                "instances": study.get("_instances", 0),
+            })
+        except Exception as ex:
+            print("bridge: could not report study %s: %s" % (row.get("accession_no"), ex), flush=True)
+            return reported
+        # The EMR's own catch-all answer for a route it does not have, as opposed
+        # to the 404 /study-arrived gives for an entry that has since been deleted.
+        if r.status_code == 404 and "API route not found" in r.text:
+            arrival_unsupported = True
+            print("bridge: this EMR has no /study-arrived yet -- update the EMR; "
+                  "finished studies will stay on the worklist until then.", flush=True)
+            return reported
+        if r.ok:
+            reported += 1
+            check = (r.json() or {}).get("patient_check", "")
+            print("bridge: study arrived for %s (%s instances, patient %s)"
+                  % (row.get("accession_no"), study.get("_instances"), check), flush=True)
+        else:
+            print("bridge: EMR refused study report for %s: %s %s"
+                  % (row.get("accession_no"), r.status_code, r.text[:200]), flush=True)
+    return reported
+
+
 def sync():
     r = requests.get(FEED_URL, params={"format": "json"}, headers=AUTH, timeout=10)
     if r.status_code == 401:
@@ -136,6 +221,8 @@ def sync():
     for f in os.listdir(WL_DIR):
         if f.endswith(".wl") and f[:-3] not in current:
             os.remove(os.path.join(WL_DIR, f))
+
+    report_arrivals(rows)
     return len(current) - failed, failed
 
 
@@ -147,6 +234,9 @@ def main():
         # the heartbeat file still tells the healthcheck the process is alive.
         print("worklist-bridge: BRIDGE_TOKEN is missing or a placeholder -- the EMR will refuse it. "
               "Run setup (it writes a random one into .env) and paste it into the EMR.", flush=True)
+    if not ORTHANC_PASSWORD:
+        print("worklist-bridge: ORTHANC_PASSWORD not set -- finished studies will not be "
+              "taken off the worklist.", flush=True)
     while True:
         try:
             n, failed = sync()
