@@ -1,0 +1,50 @@
+# Isolated PACS for a development session (decision 24, 2026-09-29).
+#
+# docker-compose.yml fixes the project name (bethesda-pacs), the container
+# names, the ports 9090/4242 that imaging devices use, and the ./storage and
+# ./worklists folders. Run it unchanged from a worktree and Compose treats it as
+# the clinic's running PACS: it rebuilds those containers, re-tags their image
+# and mounts the real image store. This file gives a session its own of each.
+#
+#   docker compose -p bethesda-s-pacs-pacs --env-file <session .env> \
+#     -f docker-compose.yml -f docker-compose.session.yml up -d --build
+#
+# - ports only on 127.0.0.1, never 9090 or 4242 (a device must not reach it)
+# - images and worklist files in named volumes, not ./storage / ./worklists
+# - the bridge is built under its own tag, so the clinic's image keeps its name
+# - the bridge joins the EMR session stack's network (bethesda-s-pacs_default)
+#   and reads that EMR's feed; start the EMR session stack first
+# - the --env-file holds throwaway test values, never the clinic's .env
+#
+# Down when done:  docker compose -p bethesda-s-pacs-pacs -f docker-compose.yml -f docker-compose.session.yml down
+# (add -v to drop the test images and worklists too)
+
+services:
+  orthanc:
+    container_name: bethesda-s-pacs-orthanc
+    ports: !override
+      - "127.0.0.1:${SESSION_PACS_WEB_PORT:-9198}:8042"
+      - "127.0.0.1:${SESSION_PACS_DICOM_PORT:-11298}:4242"
+    volumes: !override
+      - session-storage:/var/lib/orthanc/db
+      - session-worklists:/var/lib/orthanc/worklists
+
+  worklist-bridge:
+    container_name: bethesda-s-pacs-bridge
+    image: bethesda-s-pacs-bridge:dev
+    environment:
+      EMR_FEED_URL: "${SESSION_EMR_FEED_URL:-http://backend:3000/api/pacs/worklist-feed}"
+    volumes: !override
+      - session-worklists:/worklists
+    networks:
+      - default
+      - emr-session
+
+networks:
+  emr-session:
+    external: true
+    name: ${SESSION_EMR_NETWORK:-bethesda-s-pacs_default}
+
+volumes:
+  session-storage:
+  session-worklists:

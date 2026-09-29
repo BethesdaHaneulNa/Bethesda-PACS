@@ -131,23 +131,44 @@ def write_wl(row, path):
     os.replace(tmp, path)
 
 
-def find_stable_study(uid):
-    """The Orthanc study with this StudyInstanceUID once it has stopped growing,
-    else None. "Stable" is Orthanc's own call (no new instance for StableAge,
-    60 s by default): reporting on the first image would take the entry off the
-    worklist while a multi-image exam is still being sent."""
+def find_study(query):
+    """Look a study up in Orthanc. Returns (state, study): 'none', 'many',
+    'unstable' or 'stable'. "Stable" is Orthanc's own call (no new instance for
+    StableAge, 60 s by default): reporting on the first image would take the
+    entry off the worklist while a multi-image exam is still being sent."""
     auth = (ORTHANC_USER, ORTHANC_PASSWORD)
     r = requests.post(ORTHANC_URL + "/tools/find", auth=auth, timeout=10,
-                      json={"Level": "Study", "Query": {"StudyInstanceUID": uid}, "Expand": True})
+                      json={"Level": "Study", "Query": query, "Expand": True})
     r.raise_for_status()
     found = r.json()
-    if not found or not found[0].get("IsStable"):
-        return None
+    if not found:
+        return "none", None
+    if len(found) > 1:
+        return "many", None
     study = found[0]
+    if not study.get("IsStable"):
+        return "unstable", study
     stats = requests.get(ORTHANC_URL + "/studies/%s/statistics" % study["ID"], auth=auth, timeout=10)
     stats.raise_for_status()
     study["_instances"] = int(stats.json().get("CountInstances", 0))
-    return study
+    return "stable", study
+
+
+def find_stable_study(uid, accession):
+    """The study for a worklist entry once it is stable, and how it was found.
+
+    First by the StudyInstanceUID the worklist handed the device. Some devices
+    make up their own UID and keep only the AccessionNumber (P-4); for those,
+    look again by accession -- but only take it when exactly one study carries
+    that accession, so an ambiguous match never lands on an order. The EMR
+    still checks the patient number inside the images either way."""
+    state, study = find_study({"StudyInstanceUID": uid})
+    if state == "none" and accession:
+        state, study = find_study({"AccessionNumber": accession})
+        if state == "many":
+            print("bridge: more than one study carries accession %s; not linking it" % accession, flush=True)
+        return (study, "accession") if state == "stable" else (None, "")
+    return (study, "uid") if state == "stable" else (None, "")
 
 
 def report_arrivals(rows):
@@ -167,7 +188,7 @@ def report_arrivals(rows):
         if not uid or not row.get("worklist_id"):
             continue
         try:
-            study = find_stable_study(uid)
+            study, found_by = find_stable_study(uid, row.get("accession_no"))
         except Exception as ex:
             # Orthanc down or the password wrong: every other row would fail
             # the same way, so say it once and try again next cycle.
@@ -185,6 +206,9 @@ def report_arrivals(rows):
                 "patient_id": tags.get("PatientID", ""),
                 "patient_name": tags.get("PatientName", ""),
                 "instances": study.get("_instances", 0),
+                "found_by": found_by,
+                "accession_no": row.get("accession_no", ""),
+                "image_study_uid": (study.get("MainDicomTags") or {}).get("StudyInstanceUID", ""),
             })
         except Exception as ex:
             print("bridge: could not report study %s: %s" % (row.get("accession_no"), scrub(ex)), flush=True)
@@ -201,8 +225,8 @@ def report_arrivals(rows):
         if r.ok:
             reported += 1
             check = (r.json() or {}).get("patient_check", "")
-            print("bridge: study arrived for %s (%s instances, patient %s)"
-                  % (row.get("accession_no"), study.get("_instances"), check), flush=True)
+            print("bridge: study arrived for %s (%s instances, patient %s, found by %s)"
+                  % (row.get("accession_no"), study.get("_instances"), check, found_by), flush=True)
         else:
             print("bridge: EMR refused study report for %s: %s %s"
                   % (row.get("accession_no"), r.status_code, r.text[:200]), flush=True)
