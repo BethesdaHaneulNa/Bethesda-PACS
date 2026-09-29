@@ -172,22 +172,30 @@ it. Linux hosts don't have this problem.
 
 ## Image backup (Windows)
 
-The EMR's own backup holds the database only - **not the images**. These scripts copy
-Orthanc's images to an external USB disk every night:
+The EMR's own backup holds the database only - **not the images**, and it stays on the
+same disk as the EMR. These scripts copy Orthanc's images **and the EMR's database
+backups** to one external USB disk every night:
 
 ```
 .\prepare-backup-disk.ps1 -Target E:\     # once per disk: marks it (drive letters change)
 .\install-image-backup.ps1               # once: nightly task at 02:30 (-WhatIf to preview)
 .\image-backup.ps1                       # what the task runs; safe to run by hand
-.
-estore-image-backup.ps1 -Verify       # monthly check (reads only)
-.
-estore-image-backup.ps1               # put the images back (disk failure, new PC)
+.\restore-image-backup.ps1 -Verify       # monthly check (reads only)
+.\restore-image-backup.ps1               # put the images back (disk failure, new PC)
 ```
 
-Only images new since the last run are copied, as the original DICOM files, and nothing
-is ever deleted from the disk. The EMR status screen warns when the disk is missing, full,
-or the backup has not succeeded recently. Details: the EMR wiki, `modules/pacs.md` 6.2.
+Only images new since the last run are copied, as the original DICOM files, and no image
+is ever deleted from the disk. The EMR's `backups\*.sql.gz` go to `BethesdaPACS\emr-backups`
+on the same disk (checked by hash and as a complete gzip; the disk keeps the EMR's rule -
+30 days, never fewer than the newest 7). The EMR folder is found beside this one
+(`Bethesda-EMR*`), or pass `-EmrPath`. To restore one, copy it into the EMR's `backups`
+folder and follow the EMR's `DEPLOYMENT.md` section 5b.
+
+**The disk holds patient images and the whole EMR database, unencrypted.** Keep it
+locked away, and never lend it or use it for anything else.
+
+The EMR status screen warns when the disk is missing, full, or the backup has not
+succeeded recently. Details: the EMR wiki, `modules/pacs.md` 6.2.
 
 ## Test tools (optional)
 

@@ -7,7 +7,12 @@
 # -> this). The StudyInstanceUIDs are unchanged, so EMR orders find their images.
 #
 #   .\restore-image-backup.ps1                 restore
-#   .\restore-image-backup.ps1 -Verify         check the disk only (monthly drill)
+#   .\restore-image-backup.ps1 -Verify         check the disk only (monthly drill),
+#                                              including the EMR database backups on it
+#
+# The EMR database backups on the disk (BethesdaPACS\emr-backups) are NOT
+# restored here: copy one into the EMR's backups folder and follow the EMR's
+# DEPLOYMENT.md section 5b.
 #
 # At the end it also counts EMR imaging orders recorded as "images arrived"
 # whose study Orthanc does not have - the number that should be 0 afterwards.
@@ -57,7 +62,9 @@ function Show-EmrLinks {
 
 if ($Verify) {
   $bad = 0
-  foreach ($f in @($files | Get-Random -Count ([math]::Min($Sample, $files.Count)))) {
+  # (Get-Random refuses -Count 0: a disk with no images yet has nothing to sample.)
+  $picked = if ($files.Count -gt 0) { @($files | Get-Random -Count ([math]::Min($Sample, $files.Count))) } else { @() }
+  foreach ($f in $picked) {
     # A DICOM file has 'DICM' at byte 128.
     try {
       $fs = [IO.File]::OpenRead($f.FullName); $buf = New-Object byte[] 132
@@ -72,6 +79,19 @@ if ($Verify) {
     if ($files.Count -lt $inOrthanc) { Write-Host "  WARNING: fewer on the disk than in Orthanc - last night's backup may not have run." -ForegroundColor Yellow; $bad++ }
   }
   Show-EmrLinks
+  # The EMR database backups copied by image-backup.ps1 (emr-backups). This script
+  # does not restore them: copy the chosen file into the EMR's backups folder and
+  # follow the EMR's DEPLOYMENT.md section 5b.
+  $emrCopies = @(Get-EmrBackupFiles (Join-Path $disks[0] "$BackupDirName\$EmrBackupDirName"))
+  if ($emrCopies.Count -eq 0) {
+    Write-Host 'EMR database backups on the disk: none.' -ForegroundColor Yellow
+  } else {
+    $newest = Get-EmrBackupDate $emrCopies[0]
+    $ok = Test-GzipFile $emrCopies[0].FullName
+    Write-Host ("EMR database backups on the disk: $($emrCopies.Count); newest $($emrCopies[0].Name) (" + $newest.ToString('yyyy-MM-dd HH:mm') + '), ' + $(if ($ok) { 'reads as a complete gzip.' } else { 'DAMAGED - not a complete gzip.' }))
+    if (-not $ok) { $bad++ }
+    if (((Get-Date) - $newest).TotalHours -gt 36) { Write-Host '  WARNING: the newest EMR backup on the disk is more than 36 hours old.' -ForegroundColor Yellow; $bad++ }
+  }
   if ($bad -gt 0) { exit 1 } else { Write-Host 'VERIFIED'; exit 0 }
 }
 

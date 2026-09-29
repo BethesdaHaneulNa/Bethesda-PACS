@@ -4,7 +4,9 @@
 # backup (02:00 by default). "Only when the user is logged on": Docker Desktop
 # itself runs in the logged-on user's session, so the PACS is only up then too,
 # and no administrator rights or stored password are needed. A night the PC was
-# off is caught up at the next start.
+# off is caught up at the next start. The same run copies the EMR's database
+# backups to the disk; the EMR folder is found beside this one (Bethesda-EMR*),
+# or give it with -EmrPath.
 #
 # This changes a Windows setting. It is run once, on the clinic's server, by the
 # person installing - not by a development session.
@@ -12,8 +14,10 @@
 #   .\install-image-backup.ps1            register
 #   .\install-image-backup.ps1 -WhatIf    show what would be registered, change nothing
 #   .\install-image-backup.ps1 -Remove    unregister
+#   .\install-image-backup.ps1 -EmrPath D:\Bethesda-EMR    when the EMR folder is not beside this one
 param(
   [string]$At = '02:30',
+  [string]$EmrPath = '',
   [switch]$Remove,
   [switch]$WhatIf
 )
@@ -21,6 +25,7 @@ $ErrorActionPreference = 'Continue'
 $taskName = 'Bethesda PACS image backup'
 $script = Join-Path $PSScriptRoot 'image-backup.ps1'
 $arg = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$script`""
+if ($EmrPath) { $arg += " -EmrPath `"$([IO.Path]::GetFullPath($EmrPath))`"" }
 
 if ($Remove) {
   if ($WhatIf) { Write-Host "Would remove scheduled task '$taskName'."; exit 0 }

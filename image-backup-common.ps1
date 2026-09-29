@@ -46,6 +46,76 @@ function Get-FreeSpace([string]$root) {
 # UIDs are digits and dots; anything else never becomes part of a path.
 function Test-Uid([string]$u) { return ($u -match '^[0-9.]{1,64}$') }
 
+# ── EMR database backups on the same disk (decision: one external disk for both) ──
+#
+# The EMR writes bethesda_YYYY-MM-DD_HHMM.sql.gz nightly at 02:00 into its own
+# backups folder (or BACKUP_PATH from the EMR's .env). Those files are copied to
+# <disk>\BethesdaPACS\emr-backups. The EMR's own folder and settings are never
+# touched, so an unplugged disk cannot affect the EMR.
+$EmrBackupDirName = 'emr-backups'
+$EmrBackupMinKeep = 7            # same rule as the EMR (backend/src/services/backup.js)
+
+# The EMR folder: the one given, else a Bethesda-EMR* folder beside the PACS
+# folder that holds the EMR's docker-compose.yml. With several, the one with the
+# newest backup. $null when none.
+function Find-EmrFolder([string]$given, [string]$pacsDir) {
+  if ($given) { if (Test-Path (Join-Path $given 'docker-compose.yml')) { return [IO.Path]::GetFullPath($given) } else { return $null } }
+  $parent = Split-Path -Parent $pacsDir
+  $cands = @(Get-ChildItem $parent -Directory -Filter 'Bethesda-EMR*' -ErrorAction SilentlyContinue |
+    Where-Object { Test-Path (Join-Path $_.FullName 'docker-compose.yml') })
+  if ($cands.Count -eq 0) { return $null }
+  $best = $cands | Sort-Object { $n = @(Get-EmrBackupFiles (Get-EmrBackupDir $_.FullName)) | Select-Object -First 1; if ($n) { $n.LastWriteTime } else { [datetime]::MinValue } } -Descending | Select-Object -First 1
+  return $best.FullName
+}
+
+# Where that EMR writes its backups: BACKUP_PATH in its .env when set (a path
+# relative to the EMR folder is taken from there), else <EMR>\backups.
+function Get-EmrBackupDir([string]$emr) {
+  $bp = (Read-PacsEnv (Join-Path $emr '.env'))['BACKUP_PATH']
+  if ($bp) { $bp = $bp.Trim('"', "'"); if ([IO.Path]::IsPathRooted($bp)) { return $bp } else { return (Join-Path $emr $bp) } }
+  return (Join-Path $emr 'backups')
+}
+
+# Finished EMR backups in a folder, newest first. Only the top level: a dump
+# still being written sits in .inprogress and never counts.
+function Get-EmrBackupFiles([string]$dir) {
+  if (-not $dir -or -not (Test-Path $dir)) { return @() }
+  return @(Get-ChildItem $dir -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -match '^(bethesda|medconnect)_[A-Za-z0-9_.-]*\.sql\.gz$' -and $_.Length -gt 0 } |
+    Sort-Object { Get-EmrBackupDate $_ } -Descending)
+}
+
+# The date a backup was taken: from its name (bethesda_2026-09-29_0200.sql.gz),
+# else the file's time. By name, because a copy may carry a new file time.
+function Get-EmrBackupDate($file) {
+  if ($file.Name -match '_(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})\.sql\.gz$') {
+    return (Get-Date -Year $Matches[1] -Month $Matches[2] -Day $Matches[3] -Hour $Matches[4] -Minute $Matches[5] -Second 0 -Millisecond 0)
+  }
+  return $file.LastWriteTime
+}
+
+# Does the whole file decompress to the length its trailer records? Windows
+# PowerShell's GZipStream stops quietly at the end of a truncated file, so the
+# decompressed byte count is compared with the gzip trailer (ISIZE, the last 4
+# bytes: the original length mod 2^32). A cut-off file fails here.
+function Test-GzipFile([string]$path) {
+  $fs = $null; $gz = $null
+  try {
+    $fs = [IO.File]::OpenRead($path)
+    if ($fs.Length -lt 20) { return $false }
+    $head = New-Object byte[] 2; [void]$fs.Read($head, 0, 2)
+    if ($head[0] -ne 0x1f -or $head[1] -ne 0x8b) { return $false }
+    $fs.Seek(-4, [IO.SeekOrigin]::End) | Out-Null
+    $tail = New-Object byte[] 4; [void]$fs.Read($tail, 0, 4)
+    $isize = [BitConverter]::ToUInt32($tail, 0)
+    $fs.Seek(0, [IO.SeekOrigin]::Begin) | Out-Null
+    $gz = New-Object IO.Compression.GZipStream ($fs, [IO.Compression.CompressionMode]::Decompress)
+    $buf = New-Object byte[] 65536; [int64]$n = 0
+    while (($k = $gz.Read($buf, 0, $buf.Length)) -gt 0) { $n += $k }
+    return (($n % 4294967296) -eq $isize)
+  } catch { return $false } finally { if ($gz) { $gz.Dispose() }; if ($fs) { $fs.Dispose() } }
+}
+
 function Write-JsonAtomically([string]$path, $obj) {
   $path = [IO.Path]::GetFullPath($path)
   $tmp = $path + '.tmp'

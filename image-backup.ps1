@@ -14,11 +14,18 @@
 # change handled is kept ON THE DISK (state.json), so a fresh disk simply gets
 # everything. Nothing on the disk is ever deleted, even if Orthanc deletes it.
 #
-# Exit: 0 done, 1 failed (see message), 2 no backup disk found.
+# The same run also copies the EMR's nightly database backups (*.sql.gz) to
+# <disk>\BethesdaPACS\emr-backups - one external disk for both. That part is
+# reported separately (emr_backup*): it never turns the image result red, and an
+# image failure does not stop it.
+#
+# Exit: 0 done, 1 failed (see message), 2 no backup disk found. The exit code
+# is the images' result.
 param(
   [string]$OrthancUrl = 'http://localhost:9090',
   [string]$EmrReportUrl = 'http://localhost:9080/api/pacs/image-backup-report',
   [string]$EnvFile = (Join-Path $PSScriptRoot '.env'),
+  [string]$EmrPath = '',             # the EMR folder; default: Bethesda-EMR* beside this folder
   [string[]]$SearchRoots = @(),       # tests: folders to treat as disks
   [int]$ReserveMb = 1024,            # stop before the disk is this close to full
   [switch]$NoReport                  # tests: do not tell the EMR
@@ -40,10 +47,81 @@ function Log([string]$m) {
   Add-Content -Path $logFile -Value $line -Encoding utf8
 }
 
+# Copy the EMR's finished database backups that the disk does not have yet, then
+# prune the disk's copies by the EMR's own rule. Returns what the report carries:
+#   emr_backup  ok | not_found (no EMR folder) | none (EMR folder, no backup in it)
+#               | failed | no_disk
+#   emr_backup_ok, emr_backup_copied, emr_backup_count (on the disk),
+#   emr_backup_newest (date in the newest name on the disk), emr_backup_error
+function Copy-EmrBackups([string]$diskRoot) {
+  $r = [ordered]@{ emr_backup = 'failed'; emr_backup_ok = $false; emr_backup_copied = 0; emr_backup_count = 0; emr_backup_newest = ''; emr_backup_error = '' }
+  if (-not $diskRoot) { $r.emr_backup = 'no_disk'; $r.emr_backup_error = 'no single backup disk plugged in'; return $r }
+  $dest = Join-Path (Join-Path $diskRoot $BackupDirName) $EmrBackupDirName
+  $emr = Find-EmrFolder $EmrPath $PSScriptRoot
+  $failedNames = @()
+  # The EMR's own retention (its .env BACKUP_RETENTION_DAYS, default 30).
+  $days = 30
+  if ($emr) { $rd = (Read-PacsEnv (Join-Path $emr '.env'))['BACKUP_RETENTION_DAYS']; if ($rd -match '^\d+$' -and [int]$rd -gt 0) { $days = [int]$rd } }
+  $cutoff = (Get-Date).AddDays(-$days)
+  if (-not $emr) {
+    $r.emr_backup = 'not_found'; $r.emr_backup_error = 'EMR folder not found (use -EmrPath)'
+    Log 'EMR backups: EMR folder not found - skipped'
+  } else {
+    $src = Get-EmrBackupDir $emr
+    $files = @(Get-EmrBackupFiles $src)
+    Log "EMR backups: $($files.Count) in $src"
+    New-Item -ItemType Directory -Force -Path $dest | Out-Null
+    Get-ChildItem $dest -Filter '*.part' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+    # A file the pruning below would remove at once is not copied at all.
+    $youngest = @($files | Select-Object -First $EmrBackupMinKeep | ForEach-Object { $_.Name })
+    foreach ($f in $files) {
+      if ((Get-EmrBackupDate $f) -lt $cutoff -and $youngest -notcontains $f.Name) { continue }
+      $final = Join-Path $dest $f.Name
+      if ((Test-Path $final) -and (Get-Item $final).Length -eq $f.Length) { continue }
+      $space = Get-FreeSpace $diskRoot
+      if ($space.free -lt ($f.Length + [int64]$ReserveMb * 1MB)) { $failedNames += $f.Name; $r.emr_backup_error = 'backup disk is full'; break }
+      $part = $final + '.part'
+      try {
+        Copy-Item $f.FullName $part -Force -ErrorAction Stop
+        # Same bytes as the EMR's file, and a gzip that reads to the end.
+        if ((Get-FileHash $part -Algorithm SHA256).Hash -ne (Get-FileHash $f.FullName -Algorithm SHA256).Hash) { throw 'copy differs from the original' }
+        if (-not (Test-GzipFile $part)) { throw 'not a complete gzip file (the EMR copy may be damaged too)' }
+        if (Test-Path $final) { Remove-Item $final -Force }
+        Rename-Item $part $f.Name -ErrorAction Stop
+        (Get-Item $final).LastWriteTime = $f.LastWriteTime
+        $r.emr_backup_copied++
+      } catch {
+        Remove-Item $part -Force -ErrorAction SilentlyContinue
+        $failedNames += $f.Name; $r.emr_backup_error = "could not copy $($f.Name): $($_.Exception.Message)"
+        Log "EMR backups: $($r.emr_backup_error)"
+      }
+    }
+    if ($failedNames.Count -eq 0) { $r.emr_backup = if ($files.Count -gt 0) { 'ok' } else { 'none' } }
+    if ($files.Count -eq 0 -and -not $r.emr_backup_error) { $r.emr_backup_error = 'no EMR backup in ' + (Split-Path -Leaf $src) }
+  }
+
+  # Prune the disk's copies like the EMR does: older than its retention days, and
+  # never below the newest seven. Only after a run without copy errors.
+  $onDisk = @(Get-EmrBackupFiles $dest)
+  if ($emr -and $failedNames.Count -eq 0 -and $onDisk.Count -gt $EmrBackupMinKeep) {
+    for ($i = $onDisk.Count - 1; $i -ge $EmrBackupMinKeep; $i--) {
+      if ((Get-EmrBackupDate $onDisk[$i]) -lt $cutoff) { Remove-Item $onDisk[$i].FullName -Force -ErrorAction SilentlyContinue; Log "EMR backups: removed old copy $($onDisk[$i].Name)" }
+    }
+    $onDisk = @(Get-EmrBackupFiles $dest)
+  }
+  $r.emr_backup_count = $onDisk.Count
+  if ($onDisk.Count -gt 0) { $r.emr_backup_newest = (Get-EmrBackupDate $onDisk[0]).ToString('yyyy-MM-dd HH:mm') }
+  $r.emr_backup_ok = ($r.emr_backup -eq 'ok')
+  Log "EMR backups: $($r.emr_backup) copied=$($r.emr_backup_copied) on disk=$($r.emr_backup_count) newest=$($r.emr_backup_newest)"
+  return $r
+}
+
 # Tell the EMR (status screen) and leave the same news beside the PACS for the
 # server status window, which reads it even when the EMR is down. Counts only -
 # no patient data in either.
 function Finish([bool]$ok, [bool]$diskFound, [int]$copied, [int]$failed, [string]$err, [int]$code) {
+  try { $emrPart = Copy-EmrBackups $script:root }
+  catch { $emrPart = [ordered]@{ emr_backup = 'failed'; emr_backup_ok = $false; emr_backup_copied = 0; emr_backup_count = 0; emr_backup_newest = ''; emr_backup_error = $_.Exception.Message }; Log "EMR backups: $($_.Exception.Message)" }
   $space = if ($script:root) { Get-FreeSpace $script:root } else { @{ free = [int64]0; total = [int64]0 } }
   $report = [ordered]@{
     ok = $ok; disk_found = $diskFound; copied = $copied; failed = $failed
@@ -51,6 +129,7 @@ function Finish([bool]$ok, [bool]$diskFound, [int]$copied, [int]$failed, [string
     free_gb = [math]::Round($space.free / 1GB, 1); total_gb = [math]::Round($space.total / 1GB, 1)
     error = $err
   }
+  foreach ($k in $emrPart.Keys) { $report[$k] = $emrPart[$k] }
   $status = [ordered]@{ at = (Get-Date).ToString('o') }
   foreach ($k in $report.Keys) { $status[$k] = $report[$k] }
   Write-JsonAtomically (Join-Path $logDir 'image-backup-status.json') $status
@@ -60,7 +139,7 @@ function Finish([bool]$ok, [bool]$diskFound, [int]$copied, [int]$failed, [string
         -Headers @{ 'X-Bridge-Token' = $cfg['BRIDGE_TOKEN'] } -Body ($report | ConvertTo-Json) -TimeoutSec 15 -ErrorAction Stop | Out-Null
     } catch { Log ('could not report to the EMR: ' + $_.Exception.Message) }
   }
-  Log ("finished: ok=$ok copied=$copied failed=$failed" + $(if ($err) { " error=$err" } else { '' }))
+  Log ("finished: ok=$ok copied=$copied failed=$failed" + $(if ($err) { " error=$err" } else { '' }) + " emr_backup=$($report.emr_backup)")
   exit $code
 }
 
