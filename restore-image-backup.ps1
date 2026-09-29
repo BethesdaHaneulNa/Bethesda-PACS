@@ -86,11 +86,14 @@ if ($Verify) {
   if ($emrCopies.Count -eq 0) {
     Write-Host 'EMR database backups on the disk: none.' -ForegroundColor Yellow
   } else {
-    $newest = Get-EmrBackupDate $emrCopies[0]
     $ok = Test-GzipFile $emrCopies[0].FullName
-    Write-Host ("EMR database backups on the disk: $($emrCopies.Count); newest $($emrCopies[0].Name) (" + $newest.ToString('yyyy-MM-dd HH:mm') + '), ' + $(if ($ok) { 'reads as a complete gzip.' } else { 'DAMAGED - not a complete gzip.' }))
+    Write-Host ("EMR database backups on the disk: $($emrCopies.Count); newest $($emrCopies[0].Name), written " + $emrCopies[0].LastWriteTime.ToString('yyyy-MM-dd HH:mm') + ' on this PC''s clock, ' + $(if ($ok) { 'reads as a complete gzip.' } else { 'DAMAGED - not a complete gzip.' }))
     if (-not $ok) { $bad++ }
-    if (((Get-Date) - $newest).TotalHours -gt 36) { Write-Host '  WARNING: the newest EMR backup on the disk is more than 36 hours old.' -ForegroundColor Yellow; $bad++ }
+    # Age by the file's own time, not its name: the name is written in the EMR
+    # container's time zone (TZ, Indian/Antananarivo by default), which is not
+    # this PC's when the PC is set to another zone. image-backup.ps1 gives each
+    # copy the original's modification time, a real instant.
+    if (((Get-Date) - $emrCopies[0].LastWriteTime).TotalHours -gt 36) { Write-Host '  WARNING: the newest EMR backup on the disk is more than 36 hours old.' -ForegroundColor Yellow; $bad++ }
   }
   if ($bad -gt 0) { exit 1 } else { Write-Host 'VERIFIED'; exit 0 }
 }

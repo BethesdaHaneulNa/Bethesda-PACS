@@ -55,7 +55,8 @@ function Log([string]$m) {
 #   emr_backup_newest (date in the newest name on the disk), emr_backup_error
 function Copy-EmrBackups([string]$diskRoot) {
   $r = [ordered]@{ emr_backup = 'failed'; emr_backup_ok = $false; emr_backup_copied = 0; emr_backup_count = 0; emr_backup_newest = ''; emr_backup_error = '' }
-  if (-not $diskRoot) { $r.emr_backup = 'no_disk'; $r.emr_backup_error = 'no single backup disk plugged in'; return $r }
+  if (-not $diskRoot) { $r.emr_backup = 'no_disk'; $r.emr_backup_error = $(if ($script:unplugged) { $UnpluggedMsg } else { 'no single backup disk plugged in' }); return $r }
+  if (-not (Test-Path (Join-Path $diskRoot $MarkerName))) { $r.emr_backup = 'no_disk'; $r.emr_backup_error = $UnpluggedMsg; return $r }
   $dest = Join-Path (Join-Path $diskRoot $BackupDirName) $EmrBackupDirName
   $emr = Find-EmrFolder $EmrPath $PSScriptRoot
   $failedNames = @()
@@ -94,6 +95,7 @@ function Copy-EmrBackups([string]$diskRoot) {
         Remove-Item $part -Force -ErrorAction SilentlyContinue
         $failedNames += $f.Name; $r.emr_backup_error = "could not copy $($f.Name): $($_.Exception.Message)"
         Log "EMR backups: $($r.emr_backup_error)"
+        if (-not (Test-Path (Join-Path $diskRoot $MarkerName))) { $r.emr_backup = 'no_disk'; $r.emr_backup_error = $UnpluggedMsg; Log "EMR backups: $UnpluggedMsg"; return $r }
       }
     }
     if ($failedNames.Count -eq 0) { $r.emr_backup = if ($files.Count -gt 0) { 'ok' } else { 'none' } }
@@ -145,6 +147,8 @@ function Finish([bool]$ok, [bool]$diskFound, [int]$copied, [int]$failed, [string
 
 $script:root = $null
 $script:totalFiles = 0
+$script:unplugged = $false
+$UnpluggedMsg = 'backup disk was unplugged during the backup - plug it back in; the next run continues'
 
 if (-not $cfg['ORTHANC_PASSWORD']) { Finish $false $false 0 0 'ORTHANC_PASSWORD missing from .env' 1 }
 
@@ -164,6 +168,26 @@ Get-ChildItem $images -Recurse -Filter '*.part' -ErrorAction SilentlyContinue | 
 $state = if (Test-Path $statePath) { Get-Content $statePath -Raw | ConvertFrom-Json } else { $null }
 $seq = if ($state -and $state.last_seq) { [int64]$state.last_seq } else { [int64]0 }
 $script:totalFiles = if ($state -and $state.total_files) { [int]$state.total_files } else { 0 }
+$lastChange = if ($state -and $state.last_change) { [string]$state.last_change } else { '' }
+
+# Is the position on the disk this Orthanc's? Change numbers belong to one
+# Orthanc database: a disk carried to a new server (decision 35), or an Orthanc
+# rebuilt from the image backup, starts again from 1, and a position left by the
+# old one could skip the new one's first images for good. The change at the
+# saved position must still be there, with the same ID and time; if not, start
+# again from 0 - images already on the disk are recognised by size and skipped.
+function Get-ChangeMark($c) { return ('' + $c.Seq + '|' + $c.ChangeType + '|' + $c.ID + '|' + $c.Date) }
+if ($seq -gt 0) {
+  try {
+    $probe = Invoke-RestMethod -Uri "$OrthancUrl/changes?since=$($seq - 1)&limit=1" -Headers $headers -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
+    $at = @($probe.Changes) | Select-Object -First 1
+    $same = $at -and ([int64]$at.Seq -eq $seq) -and (-not $lastChange -or (Get-ChangeMark $at) -eq $lastChange)
+    if (-not $same) {
+      Log "the disk's position (change $seq) is not this Orthanc's - another server, or a rebuilt one. Starting again from 0; images already on the disk are skipped."
+      $seq = [int64]0; $lastChange = ''
+    } elseif (-not $lastChange) { $lastChange = Get-ChangeMark $at }   # a disk from before this check: mark it now
+  } catch { Finish $false $true 0 0 ('could not ask Orthanc for changes: ' + $_.Exception.Message) 1 }
+}
 Log "start: disk $($script:root), from change $seq"
 
 $copied = 0; $failed = 0
@@ -189,6 +213,8 @@ while ($true) {
     $dir = Join-Path $images $studyUid
     $final = Join-Path $dir ($sopUid + '.dcm')
     $size = [int64]$info.FileSize
+    # Unplugged half way: say so, rather than reading 0 GB free as "disk full".
+    if (-not (Test-Path (Join-Path $script:root $MarkerName))) { $script:root = $null; $script:unplugged = $true; Finish $false $false $copied $failed $UnpluggedMsg 1 }
     if ((Test-Path $final) -and (Get-Item $final).Length -eq $size) { continue }
 
     $space = Get-FreeSpace $script:root
@@ -206,6 +232,7 @@ while ($true) {
       $copied++; $script:totalFiles++
     } catch {
       Remove-Item $part -Force -ErrorAction SilentlyContinue
+      if (-not (Test-Path (Join-Path $script:root $MarkerName))) { $script:root = $null; $script:unplugged = $true; Finish $false $false $copied ($failed + 1) $UnpluggedMsg 1 }
       $failed++; Log "could not copy instance $id : $($_.Exception.Message)"
     }
   }
@@ -213,11 +240,14 @@ while ($true) {
   # The position moves on only once a whole page has been copied: a failure
   # leaves it where it was, so tonight's gap is retried tomorrow.
   if ($failed -gt 0) { break }
-  $seq = [int64]$page.Last
+  $pageChanges = @($page.Changes)
+  if ($pageChanges.Count -gt 0) {
+    $seq = [int64]$pageChanges[-1].Seq; $lastChange = Get-ChangeMark $pageChanges[-1]
+  }
   Write-JsonAtomically $statePath ([ordered]@{
-    last_seq = $seq; total_files = $script:totalFiles
+    last_seq = $seq; last_change = $lastChange; total_files = $script:totalFiles
     last_success = (Get-Date).ToString('o')
-    note = 'Written by image-backup.ps1. last_seq = Orthanc change already copied.'
+    note = 'Written by image-backup.ps1. last_seq = Orthanc change already copied; last_change = that change (seq|type|id|date), to tell this Orthanc from another.'
   })
   if ($page.Done) { break }
 }
