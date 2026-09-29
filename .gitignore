@@ -9,3 +9,7 @@ worklists/
 # image tarballs, and it bundles GPL/AGPL third-party images. Never commit it.
 bethesda-offline-kit/
 *.tar
+
+# image-backup.ps1 run log and last-run status (no patient data, but local to
+# this machine)
+logs/

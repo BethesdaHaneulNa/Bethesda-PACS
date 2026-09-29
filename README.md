@@ -168,6 +168,23 @@ it. Linux hosts don't have this problem.
 > 컨테이너는 `Up`으로 보이는데 접속만 안 되는 경우가 있어 원인 찾기가 어려워요. 위 `netsh`
 > 명령으로 예약된 대역을 확인하고, 겹치면 `docker-compose.yml`에서 포트를 바꾸세요.
 
+## Image backup (Windows)
+
+The EMR's own backup holds the database only - **not the images**. These scripts copy
+Orthanc's images to an external USB disk every night:
+
+```
+.\prepare-backup-disk.ps1 -Target E:\     # once per disk: marks it (drive letters change)
+.\install-image-backup.ps1               # once: nightly task at 02:30 (-WhatIf to preview)
+.\image-backup.ps1                       # what the task runs; safe to run by hand
+.estore-image-backup.ps1 -Verify       # monthly check (reads only)
+.estore-image-backup.ps1               # put the images back (disk failure, new PC)
+```
+
+Only images new since the last run are copied, as the original DICOM files, and nothing
+is ever deleted from the disk. The EMR status screen warns when the disk is missing, full,
+or the backup has not succeeded recently. Details: the EMR wiki, `modules/pacs.md` 6.2.
+
 ## Test tools (optional)
 
 `bridge/` includes small scripts to test your setup **without a real device**:
