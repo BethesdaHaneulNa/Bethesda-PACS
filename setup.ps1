@@ -72,8 +72,8 @@ Write-Host "Bethesda PACS (Orthanc) is starting at http://localhost:9090"
 Write-Host "Login with user 'admin' and the ORTHANC_PASSWORD value in .env"
 if ($lanIp) {
   Write-Host ""
-  Write-Host "In the EMR, Settings -> Order Feed -> PACS web/viewer URL:  http://${lanIp}:9090"
-  Write-Host "  (the address other PCs use, not localhost - give this PC a fixed IP)"
+  Write-Host "Imaging devices send to this PC: $lanIp, DICOM port 4242 (give this PC a fixed IP)."
+  Write-Host "Staff see images inside the EMR - nothing to set for the viewer."
 }
 if ($paired) {
   Write-Host ""

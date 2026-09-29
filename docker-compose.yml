@@ -10,7 +10,10 @@ services:
     container_name: bethesda-pacs
     restart: unless-stopped
     ports:
-      - "9090:8042"      # web UI / viewer / REST / DICOMweb
+      # Web UI / REST / DICOMweb on this machine only (P-9): staff see images
+      # through the EMR, which reaches this port via host.docker.internal and adds
+      # the login itself. Orthanc's admin pages: http://localhost:9090 on the server.
+      - "127.0.0.1:9090:8042"
       - "4242:4242"      # DICOM (C-STORE from devices, modality worklist)
     environment:
       # ── general ──
@@ -34,6 +37,10 @@ services:
       DICOM_WEB_PLUGIN_ENABLED: "true"
       ORTHANC__DICOM_WEB__ENABLE: "true"
       STONE_WEB_VIEWER_PLUGIN_ENABLED: "true"
+      # Stone's "Intended use" box at start leaves the image area black after it
+      # is closed (the picture only appears once the window is resized). The
+      # "not for diagnostic usage" notice stays on the left panel regardless.
+      ORTHANC__STONE_WEB_VIEWER__SHOW_INFO_PANEL_AT_STARTUP: "Never"
       ORTHANC_EXPLORER_2_ENABLED: "true"
     volumes:
       - ./storage:/var/lib/orthanc/db          # DICOM images + index (persist)

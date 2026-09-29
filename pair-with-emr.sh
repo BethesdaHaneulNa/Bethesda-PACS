@@ -48,8 +48,26 @@ if [ "$db" != "$want" ] || [ "$file" != "$want" ]; then
 fi
 rm -f "$BACKUP"
 
+# The image server's password too, the same way (stdin, compared by hash): the
+# EMR shows the viewer itself and adds this login on the server (P-9). An EMR
+# older than that has no column for it; the token above is still paired.
+VIEWER_NOTE=""
+OPW="$(sed -n 's/^ORTHANC_PASSWORD=//p' "$ENV_FILE" | head -1 | tr -d '\r')"
+if [ -n "$OPW" ]; then
+  if printf "UPDATE pacs_config SET orthanc_password = '%s', updated_at = NOW() WHERE id = 1;" "$(printf '%s' "$OPW" | sed "s/'/''/g")" |
+       docker exec -i "$DB" psql -U medconnect -d medconnect -q -v ON_ERROR_STOP=1 >/dev/null 2>&1; then
+    w2="$(printf '%s' "$OPW" | md5sum | cut -d' ' -f1)"
+    g2="$(docker exec "$DB" psql -U medconnect -d medconnect -tAc "SELECT md5(orthanc_password) FROM pacs_config WHERE id = 1" | tr -d '[:space:]')"
+    if [ "$w2" = "$g2" ]; then VIEWER_NOTE=" The EMR can now show images without a login."
+    else VIEWER_NOTE=" (Could not confirm the image server password in the EMR.)"; fi
+  else
+    VIEWER_NOTE=" (This EMR is older than the built-in viewer - update the EMR, then run this again.)"
+  fi
+fi
+OPW=""
+
 if [ -z "$NO_RESTART" ]; then
   docker compose up -d --force-recreate worklist-bridge ||
     { echo "Paired, but the bridge did not restart - run: docker compose up -d --force-recreate worklist-bridge"; exit 1; }
 fi
-echo "Paired with the EMR: both hold the same new bridge token (not shown)."
+echo "Paired with the EMR: both hold the same new bridge token (not shown).$VIEWER_NOTE"

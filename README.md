@@ -99,8 +99,10 @@ When the EMR is on another machine, setup prints the token instead:
 1. In the EMR, open **Settings → Order Feed**.
 2. Set **Bridge Token** to the value the setup script printed (so the two trust each other).
 
-Either way, set **PACS web / viewer URL** to `http://<this-host-ip>:9090` (setup prints the
-address) so the EMR can show images — not `localhost`, which only works on the server itself.
+The EMR shows the images itself: it relays the viewer and adds Orthanc's login on the server,
+so staff never type the Orthanc password and port 9090 is published on `127.0.0.1` only (Orthanc's
+admin pages: `http://localhost:9090` on the server). `pair-with-emr` also gives the EMR that
+password. Only the imaging devices need to reach this machine, on port 4242.
 
 On Windows, setup also runs `check-windows-ports.ps1`, which warns if Windows has reserved (or
 may reserve) port 9090 or 4242 — see *PACS won't start, or the viewer never loads* below.
@@ -135,7 +137,7 @@ patient from the worklist, will not appear under the order in the EMR.
 
 | Port | Purpose | Who needs it |
 |------|---------|--------------|
-| 9090 | Orthanc web UI / viewer / REST / DICOMweb | clinic computers + the EMR host |
+| 9090 | Orthanc web UI / REST / DICOMweb | **this machine only** (`127.0.0.1`) — the EMR relays the viewer to staff |
 | 4242 | DICOM (worklist query + image store) | imaging devices |
 
 Keep these on the clinic LAN — **do not expose them to the internet.** Orthanc holds patient
@@ -177,8 +179,10 @@ Orthanc's images to an external USB disk every night:
 .\prepare-backup-disk.ps1 -Target E:\     # once per disk: marks it (drive letters change)
 .\install-image-backup.ps1               # once: nightly task at 02:30 (-WhatIf to preview)
 .\image-backup.ps1                       # what the task runs; safe to run by hand
-.estore-image-backup.ps1 -Verify       # monthly check (reads only)
-.estore-image-backup.ps1               # put the images back (disk failure, new PC)
+.
+estore-image-backup.ps1 -Verify       # monthly check (reads only)
+.
+estore-image-backup.ps1               # put the images back (disk failure, new PC)
 ```
 
 Only images new since the last run are copied, as the original DICOM files, and nothing
@@ -220,18 +224,14 @@ That means "the host machine, as seen from inside a container" (works on Docker 
 PCs and imaging devices, use the host's **LAN IP** instead (e.g. `192.168.0.55`), which works
 from both the container and a browser.
 
-Note: the **PACS web/viewer URL stays `http://localhost:9090`** — that one is opened by your
-*browser* (where `localhost` = your PC), so it's correct as-is. The two fields legitimately take
-different values.
-
 Also: this DICOM test is only a convenience check. The imaging integration actually works through
-the **bridge token** (worklist feed) and the **viewer URL**, so a red ✗ here does **not** stop the
-worklist or image viewing from working.
+the **bridge token** (worklist feed) and the EMR's built-in viewer relay, so a red ✗ here does
+**not** stop the worklist or image viewing from working.
 
 > 한국어 — 연결 테스트가 빨간 ✗ 뜨면: Host/IP를 `localhost` 대신 **`host.docker.internal`**
 > (또는 이 PC의 **LAN IP**)로 바꾸세요. 컨테이너 안에서 `localhost`는 PC가 아니라 컨테이너
-> 자기 자신을 가리켜서 그래요. **뷰어 주소(`localhost:9090`)는 브라우저가 여는 거라 그대로** 두면
-> 됩니다. 이 테스트는 확인용이라 ✗여도 워크리스트·뷰어 기능 자체는 동작해요.
+> 자기 자신을 가리켜서 그래요. 이 테스트는 확인용이라 ✗여도 워크리스트·영상 보기 자체는 동작해요
+> (영상은 EMR이 대신 보여 줍니다).
 
 ---
 
@@ -241,7 +241,9 @@ worklist or image viewing from working.
 - The bridge token is random and must match the EMR's setting. The EMR refuses a token under 16
   characters or the old `change-me-…` placeholder, and the bridge sends it in a request header,
   never in a URL.
-- Keep ports `9090` / `4242` on the LAN only. Use a VPN for any remote access.
+- Staff never need the Orthanc password: the EMR shows the viewer and adds the login on the server
+  (`pair-with-emr` gives it the password on stdin). Port 9090 is published on `127.0.0.1` only.
+- Keep port `4242` on the LAN only (imaging devices). Use a VPN for any remote access.
 
 ## Questions & feature requests
 

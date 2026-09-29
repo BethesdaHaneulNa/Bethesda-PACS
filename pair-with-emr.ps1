@@ -69,6 +69,25 @@ if ($db -ne $want -or $file -ne $want) {
 }
 Remove-Item $backup -Force
 
+# The image server's password too, the same way (stdin, compared by hash): the
+# EMR shows the viewer itself and adds this login on the server (P-9), so staff
+# never need it. An EMR from before that change has no column for it - the
+# token above is still paired, and the viewer simply keeps its old behaviour.
+$viewerNote = ''
+$opw = ($lines | Where-Object { $_ -match '^ORTHANC_PASSWORD=' } | Select-Object -First 1) -replace '^ORTHANC_PASSWORD=', ''
+if ($opw) {
+  "UPDATE pacs_config SET orthanc_password = '$($opw -replace "'", "''")', updated_at = NOW() WHERE id = 1;" |
+    docker exec -i $DbContainer psql -U medconnect -d medconnect -q -v ON_ERROR_STOP=1 2>$null
+  if ($LASTEXITCODE -eq 0) {
+    $want2 = Md5 $opw
+    $got2 = (docker exec $DbContainer psql -U medconnect -d medconnect -tAc "SELECT md5(orthanc_password) FROM pacs_config WHERE id = 1").Trim()
+    $viewerNote = if ($got2 -eq $want2) { ' The EMR can now show images without a login.' } else { ' (Could not confirm the image server password in the EMR.)' }
+  } else {
+    $viewerNote = ' (This EMR is older than the built-in viewer - update the EMR, then run this again.)'
+  }
+}
+Remove-Variable opw -ErrorAction SilentlyContinue
+
 if (-not $NoRestart) {
   # The bridge reads .env only when its container is created.
   Push-Location $PSScriptRoot
@@ -77,5 +96,5 @@ if (-not $NoRestart) {
   Pop-Location
   if (-not $restarted) { Write-Host 'Paired, but the bridge did not restart - run: docker compose up -d --force-recreate worklist-bridge'; exit 1 }
 }
-Write-Host 'Paired with the EMR: both hold the same new bridge token (not shown).'
+Write-Host ('Paired with the EMR: both hold the same new bridge token (not shown).' + $viewerNote)
 exit 0

@@ -37,16 +37,16 @@ if errorlevel 1 (
 color 0A
 echo.
 echo ==================================================
-echo    Bethesda PACS is running:  http://localhost:9090
+echo    Bethesda PACS is running (admin pages on this PC: http://localhost:9090)
 echo.
 echo    Pairing with the EMR: read the lines ABOVE.
 echo     - "paired with the EMR"  : nothing to do.
 echo     - otherwise: start the EMR on this PC and run pair-with-emr.ps1,
 echo       or paste the Bridge Token shown above into the EMR
 echo       (Settings -^> Order Feed -^> Bridge Token).
-echo    In the EMR set the PACS viewer URL to the address shown above
-echo    (this PC's network address, e.g. http://192.168.x.x:9090 -
-echo    not localhost, which only works on this PC).
+echo    Staff see the images inside the EMR - no viewer address to set.
+echo    Imaging devices send to this PC's network address shown above,
+echo    DICOM port 4242 (give this PC a fixed IP).
 echo ==================================================
 echo.
 pause

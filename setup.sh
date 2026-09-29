@@ -61,8 +61,8 @@ echo "Bethesda PACS (Orthanc) is starting at http://localhost:9090"
 echo "Login with user 'admin' and the ORTHANC_PASSWORD value in .env"
 if [ -n "$LAN_IP" ]; then
   echo ""
-  echo "In the EMR, Settings -> Order Feed -> PACS web/viewer URL:  http://$LAN_IP:9090"
-  echo "  (the address other PCs use, not localhost - give this machine a fixed IP)"
+  echo "Imaging devices send to this machine: $LAN_IP, DICOM port 4242 (give it a fixed IP)."
+  echo "Staff see images inside the EMR - nothing to set for the viewer."
 fi
 if [ -n "$PAIRED" ]; then
   echo ""
