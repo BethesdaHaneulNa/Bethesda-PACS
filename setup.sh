@@ -27,7 +27,7 @@ if [ ! -f .env ]; then
     echo "ORTHANC_PASSWORD=$(gen 16)"
     echo ""
     echo "# Worklist bridge -> EMR. BRIDGE_TOKEN must match the EMR's"
-    echo "# Settings -> Order Feed -> Bridge Token (paste the value printed below)."
+    echo "# Settings -> Order Feed -> Bridge Token. pair-with-emr.sh sets both."
     echo "BRIDGE_TOKEN=$BRIDGE_TOKEN"
     echo "# EMR_FEED_URL=http://host.docker.internal:9080/api/pacs/worklist-feed"
   } > .env
@@ -43,14 +43,40 @@ else
   docker compose up -d
 fi
 
+# First run with the EMR on this machine: pair the two directly, so the token is
+# never read off the screen and typed into the EMR (pair-with-emr.sh makes a new
+# token, gives it to the EMR on stdin and to .env, and restarts the bridge).
+PAIRED=""
+if [ -n "$BRIDGE_TOKEN" ] && [ "$(docker inspect -f '{{.State.Running}}' bethesda-emr-db 2>/dev/null)" = "true" ]; then
+  echo ""
+  echo "The EMR is running on this machine - pairing the worklist bridge with it..."
+  sh ./pair-with-emr.sh && PAIRED=1
+fi
+
+# The address the other PCs' browsers use for the viewer (not localhost).
+LAN_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+
 echo ""
 echo "Bethesda PACS (Orthanc) is starting at http://localhost:9090"
 echo "Login with user 'admin' and the ORTHANC_PASSWORD value in .env"
-if [ -n "$BRIDGE_TOKEN" ]; then
+if [ -n "$LAN_IP" ]; then
+  echo ""
+  echo "In the EMR, Settings -> Order Feed -> PACS web/viewer URL:  http://$LAN_IP:9090"
+  echo "  (the address other PCs use, not localhost - give this machine a fixed IP)"
+fi
+if [ -n "$PAIRED" ]; then
+  echo ""
+  echo "Worklist bridge paired with the EMR on this machine - nothing to copy."
+elif [ -n "$BRIDGE_TOKEN" ]; then
   echo ""
   echo "==================================================================="
   echo " IMPORTANT — pair the worklist bridge with the EMR:"
-  echo " In the EMR, open Settings -> Order Feed -> Bridge Token and set it to:"
+  echo " If the EMR runs on this machine: start it, then run ./pair-with-emr.sh"
+  echo " Otherwise, in the EMR open Settings -> Order Feed -> Bridge Token"
+  echo " and set it to:"
   echo "   $BRIDGE_TOKEN"
   echo "==================================================================="
 fi
+echo ""
+echo "After restoring an EMR backup, run ./pair-with-emr.sh again - the backup"
+echo "brings the old machine's bridge token with it."

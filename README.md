@@ -84,9 +84,26 @@ token**, then starts Orthanc + the bridge. It prints the bridge token at the end
 
 ### Pair it with the EMR (one-time)
 
+**When the EMR runs on the same machine** (the usual case), setup pairs the two for you: it
+writes one new bridge token into this folder's `.env` and into the EMR's settings, without
+ever printing it. To do it again later — and **always after restoring an EMR backup**, which
+brings the old machine's token with it — run:
+
+```
+.\pair-with-emr.ps1        # Windows
+./pair-with-emr.sh         # Linux / NAS
+```
+
+When the EMR is on another machine, setup prints the token instead:
+
 1. In the EMR, open **Settings → Order Feed**.
 2. Set **Bridge Token** to the value the setup script printed (so the two trust each other).
-3. Set **PACS web / viewer URL** to `http://<this-host-ip>:9090` so the EMR can show images.
+
+Either way, set **PACS web / viewer URL** to `http://<this-host-ip>:9090` (setup prints the
+address) so the EMR can show images — not `localhost`, which only works on the server itself.
+
+On Windows, setup also runs `check-windows-ports.ps1`, which warns if Windows has reserved (or
+may reserve) port 9090 or 4242 — see *PACS won't start, or the viewer never loads* below.
 
 That's it — orders placed in the EMR now appear on your imaging devices, and images come back
 into the EMR.
