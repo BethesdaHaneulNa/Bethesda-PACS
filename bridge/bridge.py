@@ -12,8 +12,8 @@ import requests
 from pydicom.dataset import Dataset, FileDataset
 from pydicom.uid import generate_uid, ExplicitVRLittleEndian
 
-FEED_URL = os.environ.get("EMR_FEED_URL", "http://host.docker.internal:8080/api/pacs/worklist-feed")
-TOKEN    = os.environ.get("BRIDGE_TOKEN", "change-me-bridge-token")
+FEED_URL = os.environ.get("EMR_FEED_URL", "http://host.docker.internal:9080/api/pacs/worklist-feed")
+TOKEN    = os.environ.get("BRIDGE_TOKEN", "")
 WL_DIR   = os.environ.get("WL_DIR", "/worklists")
 POLL     = int(os.environ.get("POLL_SECONDS", "15"))
 
@@ -29,6 +29,16 @@ MWL_SOP_CLASS = "1.2.840.10008.5.1.4.31"  # Modality Worklist Information Model 
 HEARTBEAT_URL  = FEED_URL.replace("/worklist-feed", "/bridge-heartbeat")
 HEARTBEAT_FILE = os.path.join(WL_DIR, ".heartbeat")
 
+# The token travels in a header, never the URL: the EMR logs every request line,
+# and a token in the query string was being written there every 15 seconds.
+# Every EMR release has accepted X-Bridge-Token on both endpoints.
+AUTH = {"X-Bridge-Token": TOKEN}
+
+# The EMR refuses a short token or the old placeholder, whatever the two sides
+# agree on, because the placeholder is published in this repository.
+PLACEHOLDER_TOKENS = ("change-me-bridge-token",)
+MIN_TOKEN_LENGTH = 16
+
 
 def report(ok, synced=0, failed=0, error=""):
     try:
@@ -37,8 +47,7 @@ def report(ok, synced=0, failed=0, error=""):
     except Exception as ex:
         print("bridge: could not write heartbeat file:", ex, flush=True)
     try:
-        requests.post(HEARTBEAT_URL, timeout=5, json={
-            "token": TOKEN,
+        requests.post(HEARTBEAT_URL, timeout=5, headers=AUTH, json={
             "ok": bool(ok),
             "synced": synced,
             "failed": failed,
@@ -91,7 +100,16 @@ def write_wl(row, path):
 
 
 def sync():
-    r = requests.get(FEED_URL, params={"token": TOKEN, "format": "json"}, timeout=10)
+    r = requests.get(FEED_URL, params={"format": "json"}, headers=AUTH, timeout=10)
+    if r.status_code == 401:
+        # Say which side to fix: a bare "401 Unauthorized" is what someone on site
+        # would otherwise be reading down the phone.
+        try:
+            why = r.json().get("error", "")
+        except Exception:
+            why = ""
+        raise RuntimeError("EMR refused the bridge token (%s). BRIDGE_TOKEN in this PACS's .env "
+                           "must equal EMR Settings -> Order Feed -> Bridge Token." % (why or "401"))
     r.raise_for_status()
     data = r.json()
     rows = data.get("rows", []) if isinstance(data, dict) else (data or [])
@@ -124,6 +142,11 @@ def sync():
 def main():
     os.makedirs(WL_DIR, exist_ok=True)
     print("worklist-bridge: feed=%s poll=%ss dir=%s" % (FEED_URL, POLL, WL_DIR), flush=True)
+    if len(TOKEN) < MIN_TOKEN_LENGTH or TOKEN in PLACEHOLDER_TOKENS:
+        # Keep running rather than exit: a restart loop would hide this line, and
+        # the heartbeat file still tells the healthcheck the process is alive.
+        print("worklist-bridge: BRIDGE_TOKEN is missing or a placeholder -- the EMR will refuse it. "
+              "Run setup (it writes a random one into .env) and paste it into the EMR.", flush=True)
     while True:
         try:
             n, failed = sync()
