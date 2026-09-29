@@ -7,7 +7,7 @@ info via DICOM Modality Worklist.
 
 EMR (orders) --HTTP--> this bridge --.wl files--> Orthanc worklists --MWL--> device
 """
-import os, time
+import os, re, time
 import requests
 from pydicom.dataset import Dataset, FileDataset
 from pydicom.uid import generate_uid, ExplicitVRLittleEndian
@@ -53,6 +53,23 @@ ARRIVED_URL      = FEED_URL.replace("/worklist-feed", "/study-arrived")
 # rather than log the same line every cycle.
 arrival_unsupported = False
 
+# Why the last arrival check could not be done, or "" when it could. Sent with
+# every heartbeat as `arrivals_error`: the worklist keeps syncing when Orthanc
+# cannot be asked, so without this the EMR's status screen stays green while
+# finished patients quietly stop leaving the device worklist.
+arrivals_error = ""
+
+
+def scrub(text):
+    """Error text is sent to the EMR and shown on a status screen, so no secret
+    may ride along: credentials written into a URL, or the token and password
+    themselves should an exception ever quote them."""
+    text = re.sub(r"//[^/@\s]+@", "//***@", str(text))
+    for secret in (TOKEN, ORTHANC_PASSWORD):
+        if secret:
+            text = text.replace(secret, "***")
+    return text
+
 
 def report(ok, synced=0, failed=0, error=""):
     try:
@@ -65,8 +82,9 @@ def report(ok, synced=0, failed=0, error=""):
             "ok": bool(ok),
             "synced": synced,
             "failed": failed,
-            "error": str(error)[:500],
+            "error": scrub(error)[:500],
             "poll_seconds": POLL,
+            "arrivals_error": scrub(arrivals_error)[:300],
         })
     except Exception:
         # The EMR being down is already its own alarm; do not add noise here.
@@ -136,9 +154,13 @@ def report_arrivals(rows):
     """Tell the EMR about every scheduled study that is now in Orthanc. The EMR
     marks the entry completed, so the next feed leaves it out and its .wl file is
     swept. Failures here never stop the worklist itself from syncing."""
-    global arrival_unsupported
-    if not ORTHANC_PASSWORD or arrival_unsupported:
+    global arrival_unsupported, arrivals_error
+    if not ORTHANC_PASSWORD:
+        arrivals_error = "ORTHANC_PASSWORD not set; finished studies stay on the worklist"
         return 0
+    if arrival_unsupported:
+        return 0
+    arrivals_error = ""
     reported = 0
     for row in rows:
         uid = row.get("study_instance_uid")
@@ -149,7 +171,8 @@ def report_arrivals(rows):
         except Exception as ex:
             # Orthanc down or the password wrong: every other row would fail
             # the same way, so say it once and try again next cycle.
-            print("bridge: could not ask Orthanc about studies:", ex, flush=True)
+            print("bridge: could not ask Orthanc about studies:", scrub(ex), flush=True)
+            arrivals_error = "could not ask Orthanc: %s" % ex
             return reported
         if not study:
             continue
@@ -164,12 +187,14 @@ def report_arrivals(rows):
                 "instances": study.get("_instances", 0),
             })
         except Exception as ex:
-            print("bridge: could not report study %s: %s" % (row.get("accession_no"), ex), flush=True)
+            print("bridge: could not report study %s: %s" % (row.get("accession_no"), scrub(ex)), flush=True)
+            arrivals_error = "could not report a study to the EMR: %s" % ex
             return reported
         # The EMR's own catch-all answer for a route it does not have, as opposed
         # to the 404 /study-arrived gives for an entry that has since been deleted.
         if r.status_code == 404 and "API route not found" in r.text:
             arrival_unsupported = True
+            arrivals_error = "EMR has no /study-arrived; update the EMR"
             print("bridge: this EMR has no /study-arrived yet -- update the EMR; "
                   "finished studies will stay on the worklist until then.", flush=True)
             return reported
@@ -228,7 +253,7 @@ def sync():
 
 def main():
     os.makedirs(WL_DIR, exist_ok=True)
-    print("worklist-bridge: feed=%s poll=%ss dir=%s" % (FEED_URL, POLL, WL_DIR), flush=True)
+    print("worklist-bridge: feed=%s poll=%ss dir=%s" % (scrub(FEED_URL), POLL, WL_DIR), flush=True)
     if len(TOKEN) < MIN_TOKEN_LENGTH or TOKEN in PLACEHOLDER_TOKENS:
         # Keep running rather than exit: a restart loop would hide this line, and
         # the heartbeat file still tells the healthcheck the process is alive.
@@ -246,7 +271,7 @@ def main():
             print(msg, flush=True)
             report(True, synced=n, failed=failed)
         except Exception as ex:
-            print("bridge error:", ex, flush=True)
+            print("bridge error:", scrub(ex), flush=True)
             report(False, error=ex)
         time.sleep(POLL)
 

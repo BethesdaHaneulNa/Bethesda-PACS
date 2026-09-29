@@ -1,12 +1,17 @@
 # one-off: upload 5 CR images into the Chest PA study (order 35) to test multi-image display
-import io, requests
+import io, os, requests
 from pydicom.dataset import Dataset, FileDataset
 from pydicom.uid import generate_uid, ExplicitVRLittleEndian, SecondaryCaptureImageStorage
 
-STUDY_UID = "1.2.826.0.1.3680043.20260627.35.7807"   # Chest PA worklist study_instance_uid
-ACCESSION = "260627-35"
-ORTHANC = "http://orthanc:8042/instances"
-AUTH = ("admin", "medconnectpacs")
+# Run inside the bridge container, which has ORTHANC_PASSWORD in its environment:
+#   docker exec -i -e STUDY_UID=... -e ACCESSION=... -e PATIENT_ID=... bethesda-worklist-bridge python - < make_chest5.py
+# Take STUDY_UID / ACCESSION / PATIENT_ID (chart number) from a test order in the
+# EMR feed, or the image lands on no order (or shows the patient-number warning).
+STUDY_UID = os.environ.get("STUDY_UID", "1.2.826.0.1.3680043.20260627.35.7807")
+ACCESSION = os.environ.get("ACCESSION", "260627-35")
+PATIENT_ID = os.environ.get("PATIENT_ID", "PX-TEST-0001")
+ORTHANC = os.environ.get("ORTHANC_URL", "http://orthanc:8042") + "/instances"
+AUTH = ("admin", os.environ["ORTHANC_PASSWORD"])
 R = C = 256
 
 
@@ -29,10 +34,10 @@ for i in range(1, 6):
 
     ds = FileDataset("c.dcm", {}, file_meta=fm, preamble=b"\0" * 128)
     ds.SpecificCharacterSet = "ISO_IR 192"
-    ds.PatientName = "Haneul^Na"
-    ds.PatientID = "26-00001"
-    ds.PatientBirthDate = "19960910"
-    ds.PatientSex = "M"
+    ds.PatientName = "TEST^Patient"
+    ds.PatientID = PATIENT_ID
+    ds.PatientBirthDate = "19800101"
+    ds.PatientSex = "O"
     ds.AccessionNumber = ACCESSION
     ds.Modality = "CR"
     ds.StudyDescription = "Chest PA"

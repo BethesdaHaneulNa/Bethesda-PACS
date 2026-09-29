@@ -58,7 +58,10 @@ test it, and keep the old number handy so you can roll back.
 3. The imaging device queries the worklist and **sees the patient + order** automatically
    (no manual re-typing of the patient's name).
 4. The device sends the captured image back to Orthanc (**C-STORE**).
-5. In the EMR, clicking the imaging order opens the image in the **viewer**, and the doctor can
+5. Once the study has stopped growing (Orthanc's "stable", about a minute), the bridge tells the
+   EMR. The order is marked done, the patient **leaves the device worklist**, and the EMR records
+   whether the patient number inside the images matches the chart.
+6. In the EMR, clicking the imaging order opens the image in the **viewer**, and the doctor can
    write the **radiology reading**.
 
 ---
@@ -103,7 +106,9 @@ Point the device (or its workstation) at this host:
 
 The device's *own* AE Title can be anything — for an internal LAN, Orthanc is configured to
 accept queries and images from any sender. The image is matched to the EMR order by its
-**Accession Number / Study UID**, which the bridge sets — not by the AE Title.
+**Study Instance UID**, which the worklist hands the device — not by the AE Title. The device must
+keep that UID: a device that makes up its own, or an image typed in by hand without picking the
+patient from the worklist, will not appear under the order in the EMR.
 
 > The Called AE Title default is `MEDCONNECT` (an internal identifier kept in sync with the EMR).
 > You can change `ORTHANC__DICOM_AET` in `docker-compose.yml`, but then set the device's Called AE
@@ -153,6 +158,12 @@ it. Linux hosts don't have this problem.
 image, C-STORE), `q_test.py` (query the worklist, C-FIND). Handy for verifying everything works
 before connecting real equipment.
 
+Run them inside the bridge container, which is on Orthanc's network. `make_demo.py` and
+`make_chest5.py` read `ORTHANC_PASSWORD` from the environment (the container has it) and take
+`STUDY_UID`, `ACCESSION` and `PATIENT_ID` of a test order from the environment too.
+`storetest.py` and `q_test.py` need `pynetdicom`, which the bridge image does not include
+(`pip install pynetdicom` first).
+
 ---
 
 ## Troubleshooting
@@ -193,7 +204,9 @@ worklist or image viewing from working.
 ## Security
 
 - The Orthanc admin password is **randomly generated** by setup (in `.env`, git-ignored). Login: user `admin`.
-- The bridge token is random and must match the EMR's setting.
+- The bridge token is random and must match the EMR's setting. The EMR refuses a token under 16
+  characters or the old `change-me-…` placeholder, and the bridge sends it in a request header,
+  never in a URL.
 - Keep ports `9090` / `4242` on the LAN only. Use a VPN for any remote access.
 
 ## Questions & feature requests

@@ -1,13 +1,18 @@
 # one-off: create a real US DICOM with a fixed StudyInstanceUID and upload to Orthanc
 # (simulates a device acquiring an image for an MWL order)
-import io, requests
+import io, os, requests
 from pydicom.dataset import Dataset, FileDataset
 from pydicom.uid import generate_uid, ExplicitVRLittleEndian, SecondaryCaptureImageStorage
 
-STUDY_UID = "1.2.826.0.1.3680043.20260625.13.4696"   # = worklist study_instance_uid for order 13
-ACCESSION = "260627-13"
-ORTHANC = "http://orthanc:8042/instances"
-AUTH = ("admin", "medconnectpacs")
+# Run inside the bridge container, which has ORTHANC_PASSWORD in its environment:
+#   docker exec -i -e STUDY_UID=... -e ACCESSION=... -e PATIENT_ID=... bethesda-worklist-bridge python - < make_demo.py
+# Take STUDY_UID / ACCESSION / PATIENT_ID (chart number) from a test order in the
+# EMR feed, or the image lands on no order (or shows the patient-number warning).
+STUDY_UID = os.environ.get("STUDY_UID", "1.2.826.0.1.3680043.20260625.13.4696")
+ACCESSION = os.environ.get("ACCESSION", "260627-13")
+PATIENT_ID = os.environ.get("PATIENT_ID", "PX-TEST-0001")
+ORTHANC = os.environ.get("ORTHANC_URL", "http://orthanc:8042") + "/instances"
+AUTH = ("admin", os.environ["ORTHANC_PASSWORD"])
 
 ROWS, COLS = 256, 256
 # simple grayscale pattern with a brighter disc (no numpy)
@@ -25,10 +30,10 @@ fm.TransferSyntaxUID = ExplicitVRLittleEndian
 
 ds = FileDataset("img.dcm", {}, file_meta=fm, preamble=b"\0" * 128)
 ds.SpecificCharacterSet = "ISO_IR 192"
-ds.PatientName = "Haneul^Na"
-ds.PatientID = "26-00001"
-ds.PatientBirthDate = "19960910"
-ds.PatientSex = "M"
+ds.PatientName = "TEST^Patient"
+ds.PatientID = PATIENT_ID
+ds.PatientBirthDate = "19800101"
+ds.PatientSex = "O"
 ds.AccessionNumber = ACCESSION
 ds.Modality = "US"
 ds.StudyDescription = "Renal Ultrasound"
