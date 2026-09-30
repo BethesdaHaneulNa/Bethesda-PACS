@@ -108,7 +108,8 @@ On Windows, setup also runs `check-windows-ports.ps1`, which warns if Windows ha
 may reserve) port 9090 or 4242 — see *PACS won't start, or the viewer never loads* below — and
 if **another program is already listening** on 9080, 9090 or 4242 (it names the program). At the
 end, setup waits up to a minute for the worklist bridge to really reach the EMR and says so, or
-warns with the bridge's last error.
+warns with the bridge's last error. (Windows `setup.ps1` only: `setup.sh` for Linux/NAS does not
+have these two checks — the clinic's server is a Windows PC.)
 
 That's it — orders placed in the EMR now appear on your imaging devices, and images come back
 into the EMR.
