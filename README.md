@@ -129,9 +129,37 @@ Point the device (or its workstation) at this host:
 
 The device's *own* AE Title can be anything — for an internal LAN, Orthanc is configured to
 accept queries and images from any sender. The image is matched to the EMR order by its
-**Study Instance UID**, which the worklist hands the device — not by the AE Title. The device must
-keep that UID: a device that makes up its own, or an image typed in by hand without picking the
-patient from the worklist, will not appear under the order in the EMR.
+**Study Instance UID**, which the worklist hands the device — not by the AE Title. A device that
+makes up its own UID is still matched by the **accession number**; an image typed in by hand
+without picking the patient from the worklist will not appear under the order in the EMR.
+
+Turn **off** any "my AE only / Station AE" filter on the device's worklist query: EMR orders
+carry no device name (every entry says `ANY`), so such a filter always returns 0.
+
+### Watching a device while you set it up: `device-watch.bat`
+
+Double-click **`device-watch.bat`** on this PC and leave it open while you try the settings on the
+device. It says, one line at a time, what the PACS sees: a device connecting (AE and IP), a
+connection test (C-ECHO), a worklist query and how many patients it got — and *why* when it got
+0 (the device filters on its own AE, on another modality, on another date, or there is nothing
+for today) — images received (patient ID, accession, compression) and whether they match an EMR
+order (same patient ID, different ID, no ID, linked by accession, no order), then when the EMR
+records them. A device that connects and leaves without asking or sending anything is reported
+too: that is what the PACS shows when it did not accept the image type or transfer mode.
+
+```
+.\device-watch.ps1                 # images only, changes nothing (Korean; -Lang fr / en)
+.\device-watch.ps1 -Detail         # also connections and worklist queries (what the .bat runs)
+.\device-watch.ps1 -Ping 192.168.1.50 -DevicePort 104 -DeviceAet XRAY01   # can this PC reach it?
+.\device-watch.ps1 -Reset          # log level back, if a -Detail window was closed with its X
+```
+
+Orthanc writes connections and worklist queries to its log only at the *verbose* level. `-Detail`
+raises the `generic`, `dicom` and `plugins` categories through the REST API (not `http`), says so,
+and puts them back on Ctrl+C; an Orthanc restart also resets them. Nothing is written to Orthanc's
+configuration. The tool reads the EMR's worklist table (`docker exec … psql`, read only) to match
+images to orders. The step-by-step guide for the day: the EMR wiki,
+`reference/device-connection-onsite.md`.
 
 > The Called AE Title default is `MEDCONNECT` (an internal identifier kept in sync with the EMR).
 > You can change `ORTHANC__DICOM_AET` in `docker-compose.yml`, but then set the device's Called AE
