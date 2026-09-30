@@ -61,6 +61,25 @@ if ($bridgeToken) {
   }
 }
 
+# Does the bridge really reach the EMR? Pairing writes to the EMR's database
+# with docker exec, so it succeeds even when something else answers on the
+# EMR's port (2026-09: a download manager on 127.0.0.1:9080) - and then no
+# worklist ever reaches the devices. The bridge leaves worklists\.feed_ok after
+# every cycle in which the EMR's feed answered; wait for a fresh one.
+$reachesEmr = $null
+if ((docker inspect -f '{{.State.Running}}' bethesda-emr-db 2>$null) -eq 'true') {
+  Write-Host ""
+  Write-Host "Checking that the worklist bridge reaches the EMR (up to a minute)..."
+  $feedOk = Join-Path $PSScriptRoot 'worklists\.feed_ok'
+  $since = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+  $deadline = (Get-Date).AddSeconds(75)
+  $reachesEmr = $false
+  while ((Get-Date) -lt $deadline) {
+    try { if ([int64](Get-Content $feedOk -Raw -ErrorAction Stop).Trim() -ge $since) { $reachesEmr = $true; break } } catch { }
+    Start-Sleep -Seconds 3
+  }
+}
+
 # The address the other PCs' browsers use for the viewer. localhost only works on
 # this machine; the EMR setting must name this PC as the others see it.
 $lanIp = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
@@ -87,6 +106,21 @@ if ($paired) {
   Write-Host " and set it to:"
   Write-Host "   $bridgeToken"
   Write-Host "==================================================================="
+}
+if ($reachesEmr -eq $true) {
+  Write-Host ""
+  Write-Host "The worklist bridge reaches the EMR - orders will go to the devices."
+} elseif ($reachesEmr -eq $false) {
+  $why = @(docker logs --tail 20 bethesda-worklist-bridge 2>&1 | Where-Object { "$_" -match 'bridge error' } | Select-Object -Last 1)
+  Write-Host ""
+  Write-Host "===================================================================" -ForegroundColor Yellow
+  Write-Host " WARNING - the worklist bridge does NOT reach the EMR yet." -ForegroundColor Yellow
+  if ($why.Count) { Write-Host (" Last error: " + ("$($why[0])" -replace '^bridge error:\s*', '')) -ForegroundColor Yellow }
+  Write-Host " Orders will not reach the imaging devices until this is fixed." -ForegroundColor Yellow
+  Write-Host " - Another program may be using port 9080: run .\check-windows-ports.ps1" -ForegroundColor Yellow
+  Write-Host " - If the EMR is still starting, wait a minute and look at:" -ForegroundColor Yellow
+  Write-Host "     docker logs --tail 5 bethesda-worklist-bridge" -ForegroundColor Yellow
+  Write-Host "===================================================================" -ForegroundColor Yellow
 }
 Write-Host ""
 Write-Host "After restoring an EMR backup, run .\pair-with-emr.ps1 again - the backup"

@@ -7,8 +7,18 @@
 # moved to start at 1024; see the EMR wiki, PACS P-1). This only reads and
 # warns; the fix needs an administrator and a reboot.
 #
+# It also looks for OTHER programs already listening on the EMR's and the
+# PACS's ports. In 2026-09 a download manager (PikPak's DownloadServer.exe) sat
+# on 127.0.0.1:9080: Docker still published 9080 on the other addresses, so the
+# EMR opened in a browser, but everything that called 127.0.0.1 or
+# host.docker.internal - the worklist bridge included - reached that program
+# instead, and no worklist went to the devices.
+#
 #   .\check-windows-ports.ps1            exit 0 fine, 1 a port is at risk
-param([int[]]$Ports = @(9090, 4242))
+param(
+  [int[]]$Ports = @(9090, 4242),               # reserved-range check
+  [int[]]$ListenPorts = @(9080, 9090, 4242)     # "another program listens" check (EMR 9080 too)
+)
 $ErrorActionPreference = 'Continue'
 $risk = $false
 
@@ -38,11 +48,34 @@ foreach ($p in $Ports) {
   }
 }
 
-if ($risk) {
+$rangeRisk = $risk
+# Another program listening on one of the ports - on any address, 127.0.0.1
+# included. Docker Desktop's own listeners are com.docker.backend (and
+# wslrelay for WSL); anything else is someone else's.
+$dockerNames = @('com.docker.backend', 'com.docker.proxy', 'wslrelay', 'vpnkit', 'docker-proxy', 'Docker Desktop')
+$others = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+  Where-Object { $ListenPorts -contains $_.LocalPort } |
+  ForEach-Object {
+    $proc = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue
+    [pscustomobject]@{ Port = $_.LocalPort; Address = $_.LocalAddress; Name = $(if ($proc) { $proc.ProcessName } else { "process $($_.OwningProcess)" }); Path = $(if ($proc) { $proc.Path } else { '' }) }
+  } | Where-Object { $dockerNames -notcontains $_.Name } | Sort-Object Port, Name, Address -Unique)
+$busy = $false
+foreach ($o in $others) {
+  Write-Host "  WARNING: port $($o.Port) is already used by another program: $($o.Name) (listening on $($o.Address))." -ForegroundColor Yellow
+  if ($o.Path) { Write-Host "           $($o.Path)" -ForegroundColor Yellow }
+  $busy = $true
+}
+if ($busy) {
+  Write-Host "  Close that program (and stop it from starting with Windows), or change the port." -ForegroundColor Yellow
+  Write-Host "  While it runs, the EMR and the PACS can look fine but not reach each other." -ForegroundColor Yellow
+  $risk = $true
+}
+
+if ($rangeRisk) {
   Write-Host ""
   Write-Host "  To fix (as administrator), then reboot:" -ForegroundColor Yellow
   Write-Host "    netsh int ipv4 set dynamicport tcp start=49152 num=16384" -ForegroundColor Yellow
   Write-Host "    netsh int ipv6 set dynamicport tcp start=49152 num=16384" -ForegroundColor Yellow
-  exit 1
 }
+if ($risk) { exit 1 }
 exit 0

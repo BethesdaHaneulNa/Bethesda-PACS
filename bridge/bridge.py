@@ -28,6 +28,18 @@ MWL_SOP_CLASS = "1.2.840.10008.5.1.4.31"  # Modality Worklist Information Model 
 # Neither is allowed to interrupt the sync loop.
 HEARTBEAT_URL  = FEED_URL.replace("/worklist-feed", "/bridge-heartbeat")
 HEARTBEAT_FILE = os.path.join(WL_DIR, ".heartbeat")
+# Written only after a cycle in which the EMR's feed really answered. The
+# heartbeat above says "the process is alive"; this one says "and it is doing
+# its job". The healthcheck looks at both: in 2026-09 another program answered
+# on port 9080, every cycle failed, and the container stayed "healthy".
+FEED_OK_FILE   = os.path.join(WL_DIR, ".feed_ok")
+
+# What the EMR's feed can answer. Anything else (a status the EMR never sends,
+# an HTML page, JSON of another shape) means something else is listening there.
+EMR_FEED_STATUSES = (200, 401, 403, 500, 502)
+NOT_EMR = ("Something other than the EMR answered at %s (%s). Another program on the "
+           "server PC may be using the EMR's port (in 2026-09: a download manager on "
+           "127.0.0.1:9080). Close it, or run check-windows-ports.ps1 in the PACS folder to see which one.")
 
 # The token travels in a header, never the URL: the EMR logs every request line,
 # and a token in the query string was being written there every 15 seconds.
@@ -233,8 +245,15 @@ def report_arrivals(rows):
     return reported
 
 
+def not_emr(r, what):
+    return RuntimeError(NOT_EMR % (scrub(FEED_URL), "%s, HTTP %s, %s" % (
+        what, r.status_code, (r.headers.get("Content-Type") or "no content type").split(";")[0])))
+
+
 def sync():
     r = requests.get(FEED_URL, params={"format": "json"}, headers=AUTH, timeout=10)
+    if r.status_code not in EMR_FEED_STATUSES:
+        raise not_emr(r, "unexpected status")
     if r.status_code == 401:
         # Say which side to fix: a bare "401 Unauthorized" is what someone on site
         # would otherwise be reading down the phone.
@@ -245,8 +264,16 @@ def sync():
         raise RuntimeError("EMR refused the bridge token (%s). BRIDGE_TOKEN in this PACS's .env "
                            "must equal EMR Settings -> Order Feed -> Bridge Token." % (why or "401"))
     r.raise_for_status()
-    data = r.json()
-    rows = data.get("rows", []) if isinstance(data, dict) else (data or [])
+    try:
+        data = r.json()
+    except ValueError:
+        raise not_emr(r, "not JSON")
+    if isinstance(data, dict) and isinstance(data.get("rows"), list):
+        rows = data["rows"]
+    elif isinstance(data, list):
+        rows = data
+    else:
+        raise not_emr(r, "JSON without worklist rows")
 
     current = set()
     failed = 0
@@ -293,6 +320,11 @@ def main():
             if failed:
                 msg += " (%d skipped -- see errors above)" % failed
             print(msg, flush=True)
+            try:
+                with open(FEED_OK_FILE, "w") as f:
+                    f.write(str(int(time.time())))
+            except Exception as ex:
+                print("bridge: could not write feed-ok file:", ex, flush=True)
             report(True, synced=n, failed=failed)
         except Exception as ex:
             print("bridge error:", scrub(ex), flush=True)

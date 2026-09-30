@@ -79,11 +79,13 @@ services:
       - ./worklists:/worklists
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    # The bridge has no port to knock on, so it leaves a timestamp after every
-    # cycle instead. A stale timestamp means the loop is wedged -- which used to
-    # be invisible, because a wedged bridge still looks like a running container.
+    # The bridge has no port to knock on, so it leaves timestamps instead:
+    # .heartbeat after every cycle (a stale one means the loop is wedged), and
+    # .feed_ok after every cycle in which the EMR's feed really answered. Both
+    # must be fresh: in 2026-09 another program sat on port 9080, every cycle
+    # failed, and the bridge still showed "healthy" while no worklist went out.
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import os,sys,time; p='/worklists/.heartbeat'; sys.exit(0 if os.path.exists(p) and time.time()-float(open(p).read()) < 60 else 1)\""]
+      test: ["CMD-SHELL", "python -c \"import os,sys,time; f=lambda p,s: os.path.exists(p) and time.time()-float(open(p).read()) < s; sys.exit(0 if f('/worklists/.heartbeat',60) and f('/worklists/.feed_ok',120) else 1)\""]
       interval: 30s
       timeout: 10s
       retries: 2

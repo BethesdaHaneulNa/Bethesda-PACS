@@ -105,7 +105,10 @@ admin pages: `http://localhost:9090` on the server). `pair-with-emr` also gives 
 password. Only the imaging devices need to reach this machine, on port 4242.
 
 On Windows, setup also runs `check-windows-ports.ps1`, which warns if Windows has reserved (or
-may reserve) port 9090 or 4242 — see *PACS won't start, or the viewer never loads* below.
+may reserve) port 9090 or 4242 — see *PACS won't start, or the viewer never loads* below — and
+if **another program is already listening** on 9080, 9090 or 4242 (it names the program). At the
+end, setup waits up to a minute for the worklist bridge to really reach the EMR and says so, or
+warns with the bridge's last error.
 
 That's it — orders placed in the EMR now appear on your imaging devices, and images come back
 into the EMR.
@@ -213,6 +216,23 @@ Run them inside the bridge container, which is on Orthanc's network. `make_demo.
 ---
 
 ## Troubleshooting
+
+**Setup says the worklist bridge does NOT reach the EMR, or the bridge container is `unhealthy`.**
+
+The bridge logs why: `docker logs --tail 5 bethesda-worklist-bridge`. If it says *Something other
+than the EMR answered …*, another program on this PC is using the EMR's port — in 2026 a download
+manager (PikPak's `DownloadServer.exe`) sat on `127.0.0.1:9080`. The EMR still opened in a browser,
+but the bridge reached that program and no worklist went to the devices. Run
+`.\check-windows-ports.ps1` to see which program, close it (and stop it starting with Windows).
+The bridge recovers by itself within a cycle. The container turns `unhealthy` when the EMR's feed
+has not answered for two minutes, not only when the bridge process is stuck.
+
+**The EMR's image window stays empty, or Settings → Order Feed warns under "image server address".**
+
+That field is where the EMR, **inside this PC**, calls the image server — not an address for other
+PCs. Leave it at `http://host.docker.internal:9090` (the **Default** button puts it back): port 9090
+listens on this PC only, so this PC's LAN address there cannot work. The **Test image server**
+button next to the DICOM test checks exactly that path, with the stored password.
 
 **The EMR's "PACS connection test (DICOM)" shows a red ✗ when Host is `localhost`.**
 
