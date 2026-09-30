@@ -76,6 +76,8 @@ $T = @{
     store        = '장비가 영상을 보냄 — AE: {0}'
     received     = '영상 받음 — {0}장 · 보낸 곳 {1} ({2}) · 환자번호 {3} · 검사번호 {4}{5}'
     compressed   = ' · 압축 전송({0})'
+    privateType  = '  ↳ 제조사 전용 영상 종류({0}) — 서버에 저장했지만 영상 창에서는 안 보일 수 있습니다.'
+    noPixels     = '  ↳ 그림이 없는 자료 {0}개(보고서·측정값·원자료 등) — 서버에 저장했지만 영상 창에는 그림이 없습니다.'
     noPid        = '(없음)'
     matched      = '  ↳ EMR 오더와 연결됨: {0} — {1} {2}'
     pidOk        = '  ↳ 환자번호 맞음'
@@ -85,8 +87,13 @@ $T = @{
     noOrder      = '  ↳ 연결할 EMR 오더가 없음 — 목록에서 고르지 않고 장비에 손으로 친 환자일 수 있음(환자번호 {0}). 영상은 서버에 있음.'
     noEmr        = '  ↳ (EMR 데이터베이스 {0}가 이 PC에 없어 오더와 맞춰 보지 못함)'
     recorded     = '  ↳ EMR에 기록됨 — {0}: 「Réalisé」, 영상 창에서 볼 수 있음'
+    recordedNoView = '  ↳ EMR에 기록됨 — {0}: 「Réalisé」. 영상 창에 그림이 안 나올 수 있음(눈에 줄 그은 작은 그림) — 위 줄 참고'
     leftEmpty    = '장비가 연결했다가 아무것도 묻거나 보내지 않고 끊음 — AE: {0}. 영상을 보내려 했다면 서버가 그 영상 종류(SOP Class)나 전송 방식을 받지 않았을 수 있습니다 → 안내서 「④ 보냈는데 안 옴」.'
-    serverSays   = '영상 서버 알림: {0}'
+    srvRefused   = '영상 서버가 장비의 연결을 거절함 — 장비의 서버 이름(AE)·주소를 보세요.'
+    srvAborted   = '장비와의 연결이 도중에 끊김 — 선·네트워크, 또는 장비가 보내다 멈춤. 장비의 전송 대기 목록을 보세요.'
+    srvStorage   = '영상 서버가 받은 영상을 저장하지 못함 — 서버 PC의 디스크 공간을 보세요.'
+    srvData      = '영상 서버가 받은 자료를 읽지 못함 — 장비의 전송 방식(압축)·영상 종류 설정을 보세요.'
+    srvOther     = '영상 서버가 장비 연결 중에 알림을 남김 — 아래 원문을 사진으로 남겨 두세요.'
     bridgeErr    = '브리지: {0}'
     bridgeNoEmr  = '브리지가 EMR에 닿지 못함 — 장비 목록이 새로 가지 않습니다. EMR이 켜져 있는지 보세요.'
     bridgeNotEmr = '브리지: EMR이 아닌 프로그램이 답함 — 다른 프로그램이 EMR 포트(9080)를 쓰는지 check-windows-ports.ps1로 보세요.'
@@ -127,6 +134,8 @@ $T = @{
     store        = "L'appareil envoie des images — AE : {0}"
     received     = 'Images reçues — {0} · de {1} ({2}) · N° patient {3} · N° accession {4}{5}'
     compressed   = ' · envoi compressé ({0})'
+    privateType  = "  ↳ Type d'image propre au fabricant ({0}) — enregistré, mais la Visionneuse peut ne rien afficher."
+    noPixels     = "  ↳ {0} objet(s) sans image (rapport, mesures, données brutes…) — enregistré(s), mais rien à afficher dans la Visionneuse."
     noPid        = '(aucun)'
     matched      = "  ↳ Reliées à la demande de l'EMR : {0} — {1} {2}"
     pidOk        = '  ↳ N° patient correct'
@@ -136,8 +145,13 @@ $T = @{
     noOrder      = "  ↳ Aucune demande de l'EMR à relier — patient peut-être tapé à la main sur l'appareil (N° {0}). Les images sont sur le serveur."
     noEmr        = "  ↳ (base de l'EMR {0} absente de ce PC : pas de comparaison avec les demandes)"
     recorded     = "  ↳ Enregistré dans l'EMR — {0} : « Réalisé », visible dans la Visionneuse"
+    recordedNoView = "  ↳ Enregistré dans l'EMR — {0} : « Réalisé ». La Visionneuse peut ne rien afficher (petite image d'un œil barré) — voir la ligne plus haut"
     leftEmpty    = "Un appareil s'est connecté puis déconnecté sans rien demander ni envoyer — AE : {0}. S'il voulait envoyer des images, le serveur n'a peut-être pas accepté ce type d'image (SOP Class) ou ce mode d'envoi → guide « ④ envoyé mais rien reçu »."
-    serverSays   = "Message du serveur d'images : {0}"
+    srvRefused   = "Le serveur d'images refuse la connexion de l'appareil — vérifiez le nom (AE) et l'adresse du serveur dans l'appareil."
+    srvAborted   = "Connexion avec l'appareil coupée en cours — câble, réseau, ou envoi interrompu. Regardez la file d'envoi de l'appareil."
+    srvStorage   = "Le serveur d'images n'a pas pu enregistrer les images reçues — vérifiez l'espace disque du PC serveur."
+    srvData      = "Le serveur d'images ne peut pas lire les données reçues — vérifiez le mode d'envoi (compression) et le type d'image dans l'appareil."
+    srvOther     = "Le serveur d'images a signalé quelque chose pendant la connexion — photographiez le texte ci-dessous."
     bridgeErr    = 'Pont : {0}'
     bridgeNoEmr  = "Le pont n'atteint pas l'EMR — la liste des appareils n'est plus mise à jour. Vérifiez que l'EMR est démarré."
     bridgeNotEmr = "Pont : un autre programme que l'EMR répond — vérifiez avec check-windows-ports.ps1 si un programme utilise le port de l'EMR (9080)."
@@ -178,6 +192,8 @@ $T = @{
     store        = 'The device is sending images — AE: {0}'
     received     = 'Images received — {0} · from {1} ({2}) · patient ID {3} · accession {4}{5}'
     compressed   = ' · compressed ({0})'
+    privateType  = '  ↳ Vendor-private image type ({0}) — stored, but the image window may show nothing.'
+    noPixels     = '  ↳ {0} object(s) without a picture (report, measurements, raw data…) — stored, but nothing to show in the image window.'
     noPid        = '(none)'
     matched      = '  ↳ Linked to the EMR order: {0} — {1} {2}'
     pidOk        = '  ↳ Patient ID matches'
@@ -187,8 +203,13 @@ $T = @{
     noOrder      = '  ↳ No EMR order to link to — the patient may have been typed on the device (ID {0}). The images are on the server.'
     noEmr        = '  ↳ (EMR database {0} is not on this PC: no matching with orders)'
     recorded     = '  ↳ Recorded in the EMR — {0}: "Réalisé", visible in the image window'
+    recordedNoView = '  ↳ Recorded in the EMR — {0}: "Réalisé". The image window may show nothing (a crossed-out eye) — see the line above'
     leftEmpty    = 'A device connected and left without asking or sending anything — AE: {0}. If it meant to send images, the server may not have accepted that image type (SOP Class) or transfer mode → guide "④ sent but nothing arrives".'
-    serverSays   = 'Image server says: {0}'
+    srvRefused   = "The image server refused the device's connection — check the server name (AE) and address on the device."
+    srvAborted   = "The connection with the device broke off — cable, network, or the device stopped sending. Look at the device's send queue."
+    srvStorage   = 'The image server could not store the received images — check the disk space on the server PC.'
+    srvData      = "The image server could not read what it received — check the device's transfer mode (compression) and image type."
+    srvOther     = 'The image server noted something during a device connection — take a photo of the text below.'
     bridgeErr    = 'Bridge: {0}'
     bridgeNoEmr  = 'The bridge cannot reach the EMR — the device worklist is no longer updated. Check that the EMR is running.'
     bridgeNotEmr = 'Bridge: a program other than the EMR answers — run check-windows-ports.ps1 to see if a program uses the EMR port (9080).'
@@ -389,9 +410,20 @@ function Handle-LogLine([string]$line) {
     $script:storeSaid = $false
     return
   }
-  # Anything Orthanc itself flags about DICOM (refused association, bad data...)
-  if ($msg -match '^[EW]\d{4} ' -and $msg -match 'DICOM|dicom|Association|association|C-STORE|C-FIND|Rejected|refused') {
-    if ($body -notmatch 'log level|REST API call') { Say ($T.serverSays -f $body) 'Yellow' $when }
+  # Warnings and errors from Orthanc's DICOM threads only (DICOM-SERVER, DICOM-n):
+  # those are the device talking. HTTP threads (the admin pages, the EMR's viewer,
+  # the bridge), the housekeeper and Orthanc's own "W001:"-style notes are not.
+  if ($msg -match '^([EW])\d{4} [\d:.]+\s+(.+?)\s+\S+:\d+\] (.*)$') {
+    $thread = $Matches[2]; $text = $Matches[3]
+    if ($thread -notmatch '^DICOM') { return }
+    if ($text -match '^W\d{3}:') { return }
+    $plain = if ($text -match 'reject|not allowed|Unknown remote|unknown modality|called AET') { $T.srvRefused }
+             elseif ($text -match 'abort|timeout|timed out|Peer|closed|DUL') { $T.srvAborted }
+             elseif ($text -match 'storage|disk|space|full|write') { $T.srvStorage }
+             elseif ($text -match 'SOP class|transfer syntax|presentation context|Cannot|parse|corrupt|bad file') { $T.srvData }
+             else { $T.srvOther }
+    Say $plain 'Yellow' $when
+    Note ('(' + $(if ($text.Length -gt 160) { $text.Substring(0, 160) + '…' } else { $text }) + ')') 'DarkGray'
   }
 }
 $script:storeSaid = $false
@@ -420,10 +452,15 @@ try {
         } catch { continue }
         $uid = "$($tags.StudyInstanceUID)"
         if (-not $studies.ContainsKey($uid)) {
-          $studies[$uid] = @{ Count = 0; Ae = "$($meta.RemoteAET)"; Ip = "$($meta.RemoteIP)"; Pid = "$($tags.PatientID)"; Acc = "$($tags.AccessionNumber)"; Ts = @{}; First = Get-Date }
+          $studies[$uid] = @{ Count = 0; Ae = "$($meta.RemoteAET)"; Ip = "$($meta.RemoteIP)"; Pid = "$($tags.PatientID)"; Acc = "$($tags.AccessionNumber)"; Ts = @{}; First = Get-Date; Private = @{}; NoPixels = 0 }
         }
         $g = $studies[$uid]; $g.Count++; $g.Last = Get-Date; $script:lastConnect = Get-Date
         $ts = "$($meta.TransferSyntax)"; if ($tsNames.ContainsKey($ts)) { $g.Ts[$tsNames[$ts]] = $true }
+        # Image types outside the DICOM standard (UnknownSopClassAccepted stores them)
+        # and objects without a picture: stored, but the viewer may show nothing.
+        $sop = "$($meta.SopClassUid)"
+        if ($sop -and $sop -notlike '1.2.840.10008.*') { $g.Private[$sop] = $true }
+        if (-not $meta.PixelDataOffset) { $g.NoPixels++ }
         $script:lastEvent = Get-Date
       }
       $seq = [int64]$page.Last
@@ -435,6 +472,8 @@ try {
       $studies.Remove($uid)
       $comp = if ($g.Ts.Count) { $T.compressed -f (($g.Ts.Keys) -join ', ') } else { '' }
       Say ($T.received -f $g.Count, $g.Ae, $g.Ip, $(if ($g.Pid) { $g.Pid } else { $T.noPid }), $(if ($g.Acc) { $g.Acc } else { $T.noPid }), $comp) 'Cyan'
+      if ($g.Private.Count) { Note ($T.privateType -f (($g.Private.Keys) -join ', ')) 'Yellow' }
+      if ($g.NoPixels) { Note ($T.noPixels -f $g.NoPixels) 'Yellow' }
       if (-not $emrHere) { Note ($T.noEmr -f $EmrDbContainer) 'DarkGray'; continue }
       $o = Find-Order $uid $g.Acc
       if (-not $o) { Note ($T.noOrder -f $(if ($g.Pid) { $g.Pid } else { $T.noPid })) 'Yellow'; continue }
@@ -443,7 +482,9 @@ try {
       if (-not $g.Pid) { Note $T.pidMissing 'Yellow' }
       elseif ($g.Pid.Trim().ToUpper() -ne $o.Chart.Trim().ToUpper()) { Note ($T.pidDiffers -f $g.Pid, $o.Chart) 'Red' }
       else { Note $T.pidOk 'Green' }
-      if (-not $o.Recorded) { $followUps += @{ Uid = $uid; Acc = $o.Acc; Order = $o.Order; Until = (Get-Date).AddMinutes(4) } }
+      $noView = [bool]($g.Private.Count -or $g.NoPixels)
+      if (-not $o.Recorded) { $followUps += @{ Uid = $uid; Acc = $o.Acc; Order = $o.Order; Until = (Get-Date).AddMinutes(4); NoView = $noView } }
+      elseif ($noView) { Note ($T.recordedNoView -f $o.Order) 'Yellow' }
       else { Note ($T.recorded -f $o.Order) 'Green' }
     }
     # 3) the EMR recording the arrival (after the bridge sees the study settle, ~1 min)
@@ -451,7 +492,7 @@ try {
       $keep = @()
       foreach ($f in $followUps) {
         $o = Find-Order $f.Uid $f.Acc
-        if ($o -and $o.Recorded) { Say ($T.recorded -f $f.Order) 'Green' }
+        if ($o -and $o.Recorded) { if ($f.NoView) { Say ($T.recordedNoView -f $f.Order) 'Yellow' } else { Say ($T.recorded -f $f.Order) 'Green' } }
         elseif ((Get-Date) -lt $f.Until) { $keep += $f }
       }
       $followUps = $keep

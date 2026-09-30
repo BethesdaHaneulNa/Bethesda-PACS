@@ -128,7 +128,10 @@ Point the device (or its workstation) at this host:
 | Worklist (MWL) host/port | same host, `4242` |
 
 The device's *own* AE Title can be anything — for an internal LAN, Orthanc is configured to
-accept queries and images from any sender. The image is matched to the EMR order by its
+accept queries and images from any sender, and also **image types it does not know**
+(`ORTHANC__UNKNOWN_SOP_CLASS_ACCEPTED: "true"`): old devices may send vendor-private types, and
+refusing them is silent on the PACS side. They take disk space and the viewer may show nothing
+for them (a crossed-out eye). To go back, set it to `"false"` and run `docker compose up -d`. The image is matched to the EMR order by its
 **Study Instance UID**, which the worklist hands the device — not by the AE Title. A device that
 makes up its own UID is still matched by the **accession number**; an image typed in by hand
 without picking the patient from the worklist will not appear under the order in the EMR.
@@ -145,7 +148,12 @@ connection test (C-ECHO), a worklist query and how many patients it got — and 
 for today) — images received (patient ID, accession, compression) and whether they match an EMR
 order (same patient ID, different ID, no ID, linked by accession, no order), then when the EMR
 records them. A device that connects and leaves without asking or sending anything is reported
-too: that is what the PACS shows when it did not accept the image type or transfer mode.
+too: that is what the PACS shows when it did not accept the image type or transfer mode. Images
+of a vendor-private type, or objects without a picture, are flagged ("stored, but the image window
+may show nothing"). Of Orthanc's own warnings it shows only those from its DICOM threads (a
+device connection), in plain words with the original below; warnings from the web side (admin
+pages, the EMR's viewer, the bridge), the worklist housekeeper and Orthanc's coded notes
+(`W001: …`) are left out.
 
 ```
 .\device-watch.ps1                 # images only, changes nothing (Korean; -Lang fr / en)
