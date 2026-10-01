@@ -13,3 +13,7 @@ bethesda-offline-kit/
 # image-backup.ps1 run log and last-run status (no patient data, but local to
 # this machine)
 logs/
+
+# cd-export: the EMR address of this machine, and the image viewer copied beside the program
+cd-export.ini
+cd-viewer/

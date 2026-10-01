@@ -256,6 +256,43 @@ locked away, and never lend it or use it for anything else.
 The EMR status screen warns when the disk is missing, full, or the backup has not
 succeeded recently. Details: the EMR wiki, `modules/pacs.md` 6.2.
 
+## Copying a patient's images to a CD: `cd-export.bat` (Windows)
+
+Hospitals still ask for images on a CD. `cd-export.bat` is a small separate program for
+that - double-click it on any PC that reaches the EMR (French; `-Lang ko`, `-Lang en`):
+
+1. **Sign in** with an EMR account (Consultation or Payment). The first time it asks for
+   the EMR's address (`http://<server>:9080`) and keeps it in `cd-export.ini` beside the
+   program. No password and no token is ever written to disk.
+2. Type the patient's **chart number**. The patient's name and date of birth are shown,
+   to be checked, and the list of imaging exams with the number of images and the size.
+3. **Tick** the exams. The window says how much they take and, when a blank disc is in
+   the drive, whether they fit (it sees a disc put in by itself).
+4. **Graver ce CD…** asks "burn N exams of this patient to the disc in drive X?", burns,
+   checks the disc and opens the tray. **Enregistrer en fichier ISO…** and **Enregistrer
+   dans un dossier…** do the same to a disc image or to a new folder (a USB stick) - they
+   work on a PC without a burner. Every file written is read back and compared.
+
+What is written is a standard DICOM disc - `DICOMDIR` and the original files under
+`IMAGES\`, made by Orthanc itself (`/tools/create-media-extended`) - plus `README.TXT`
+(whose images, which exams, how to read the disc; French then English). No JPEG copies.
+
+- The program talks to **the EMR only**, never to Orthanc: the Orthanc password is not in
+  it, and it runs from a reception PC as well as from the server. The EMR checks the
+  account's rights, refuses exams that must not leave (cancelled, or carrying an identity
+  warning) and writes **one line in its change log per copy** - no line, no copy.
+- Only a **blank** disc is written. A disc that already holds something is never used and
+  never erased. The disc is closed: nothing can be added to it later.
+- Nothing is installed and no system setting is changed: burning is Windows' own (IMAPI2).
+  The images fetched stay under `%TEMP%\BethesdaCD` while the copy is made and are removed
+  afterwards (and at the next start, if the program was killed).
+- A folder or an ISO saved by the program holds a patient's images, unencrypted: delete it
+  when it is no longer needed.
+
+Files: `cd-export.bat` (start), `cd-export.ps1`, `cd-export-ui.ps1` (the window),
+`cd-export-common.ps1` (the work). Needs an EMR that has `GET /api/pacs/export/patient`
+and `/bundle` (EMR after 1.5.0). Details: the EMR wiki, `modules/pacs.md` 2.4.4.
+
 ## Test tools (optional)
 
 `bridge/` includes small scripts to test your setup **without a real device**:
