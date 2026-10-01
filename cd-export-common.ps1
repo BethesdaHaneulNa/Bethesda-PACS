@@ -259,6 +259,49 @@ function Write-DiscReadme {
   [IO.File]::WriteAllText((Join-Path $Dir 'README.TXT'), (($L -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding($true)))
 }
 
+# ── the viewer (optional) ────────────────────────────────────────────────────
+# A hospital reads the disc with its own imaging software. For whoever has none, the
+# Weasis viewer can be put on the disc: the folder cd-viewer beside this program - a copy
+# of an installed Weasis (how to make it: README) - goes onto the disc as VIEWER\, as it
+# is, with VOIR.BAT at the top to start it. That is how Weasis itself puts its viewer on
+# the discs it writes (its "Add Weasis" option): it is started with the option that makes
+# it open the DICOMDIR beside it. Weasis is not changed. No autorun file is written.
+$VIEWER_EXE = 'Weasis.exe'
+function Get-ViewerInfo([string]$ViewerDir) {
+  if (-not $ViewerDir -or -not (Test-Path -LiteralPath (Join-Path $ViewerDir $VIEWER_EXE) -PathType Leaf)) { return $null }
+  $n = 0; $b = [long]0
+  foreach ($f in [IO.Directory]::GetFiles($ViewerDir, '*', [IO.SearchOption]::AllDirectories)) { $n++; $b += (New-Object IO.FileInfo($f)).Length }
+  return @{ dir = (Resolve-Path -LiteralPath $ViewerDir).Path; files = $n; bytes = $b }
+}
+function Add-DiscViewer {
+  param([string]$Dir, [string]$ViewerDir, [scriptblock]$OnFile = $null)
+  $from = (Resolve-Path -LiteralPath $ViewerDir).Path.TrimEnd('\')
+  $to = Join-Path $Dir 'VIEWER'
+  $files = [IO.Directory]::GetFiles($from, '*', [IO.SearchOption]::AllDirectories)
+  $n = 0
+  foreach ($f in $files) {
+    $dest = Join-Path $to $f.Substring($from.Length + 1)
+    $parent = Split-Path -Parent $dest
+    if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+    [IO.File]::Copy($f, $dest, $true)
+    $n++; if ($OnFile -and ($n % 20 -eq 0 -or $n -eq $files.Count)) { & $OnFile $n $files.Count }
+  }
+  # The line Weasis writes in its own RUN.BAT, with the folder's name: "open what is on the
+  # disc this file is on". %% is a percent sign inside a .bat file.
+  $bat = @(
+    '@echo off',
+    'REM Ouvre les images de ce disque avec la visionneuse du dossier VIEWER (Windows 64 bits).',
+    'REM Opens the images of this disc with the viewer in the VIEWER folder (64-bit Windows).',
+    'cd /d "%~dp0"',
+    'start "" "VIEWER\Weasis.exe" "weasis://%%24dicom%%3Aget%%20-p%%20%%24weasis%%3Aconfig%%20pro%%3D%%22weasis.portable.dir%%20.%%22"'
+  )
+  [IO.File]::WriteAllText((Join-Path $Dir 'VOIR.BAT'), (($bat -join "`r`n") + "`r`n"), [Text.Encoding]::ASCII)
+  return $n
+}
+# The file systems of a disc image: ISO 9660 + Joliet for the DICOM files (what imaging
+# stations read); with the viewer also UDF, which keeps its long names and deep folders.
+function Get-DiscFileSystems([bool]$WithViewer) { if ($WithViewer) { return 7 } else { return 3 } }
+
 # ── what is in the disc folder ───────────────────────────────────────────────
 # Every file with its size and SHA-256, by its path from the top of the disc.
 function Get-DiscFiles([string]$Dir, [scriptblock]$OnFile = $null) {

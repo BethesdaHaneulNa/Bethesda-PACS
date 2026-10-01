@@ -22,7 +22,8 @@
 # is made and removed afterwards.
 param(
   [ValidateSet('fr', 'ko', 'en')][string]$Lang = 'fr',
-  [string]$ConfigPath = (Join-Path $PSScriptRoot 'cd-export.ini')
+  [string]$ConfigPath = (Join-Path $PSScriptRoot 'cd-export.ini'),
+  [string]$ViewerDir = (Join-Path $PSScriptRoot 'cd-viewer')   # a copy of an installed Weasis, if the clinic wants the viewer on its discs
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'cd-export-common.ps1')
@@ -30,7 +31,7 @@ $ErrorActionPreference = 'Stop'
 
 try {
   [void](Remove-ExportTemp)                              # what an interrupted run left behind
-  $form = New-CdxForm $Lang $ConfigPath
+  $form = New-CdxForm $Lang $ConfigPath $ViewerDir
   [void][Windows.Forms.Application]::Run($form)
 } catch {
   # started without a console (cd-export.bat): a failure must still be seen

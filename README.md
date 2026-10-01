@@ -289,6 +289,14 @@ What is written is a standard DICOM disc - `DICOMDIR` and the original files und
 - A folder or an ISO saved by the program holds a patient's images, unencrypted: delete it
   when it is no longer needed.
 
+**A viewer on the disc (optional, not yet tried with a real viewer).** If a folder `cd-viewer`
+holding `Weasis.exe` (a copy of an installed [Weasis](https://weasis.org), EPL-2.0 OR Apache-2.0,
+used unmodified) is beside the program, the window offers a tick box: the folder is then copied
+onto the disc as `VIEWER\` and `VOIR.BAT` at the top starts it on the disc's own images - the
+same way Weasis puts its viewer on the discs it writes. No autorun file is written. Without that
+folder the box is not shown and nothing changes. `cd-viewer/` is git-ignored: the viewer is not
+part of this repository.
+
 Files: `cd-export.bat` (start), `cd-export.ps1`, `cd-export-ui.ps1` (the window),
 `cd-export-common.ps1` (the work). Needs an EMR that has `GET /api/pacs/export/patient`
 and `/bundle` (EMR after 1.5.0). Details: the EMR wiki, `modules/pacs.md` 2.4.4.

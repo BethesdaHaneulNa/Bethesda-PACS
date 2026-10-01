@@ -22,6 +22,7 @@ $CdxText = @{
     noDisc = 'Graveur {0} — insérez un disque vierge.'
     discBlank = 'Graveur {0} — {1} vierge, {2} libres'; fits = '  ✔ tient sur ce disque'; tooBig = '  ✘ {0} de trop : décochez un examen ou utilisez un DVD'
     discUsed = 'Graveur {0} — ce disque n''est pas vierge : il ne sera pas utilisé.'; discOther = 'Graveur {0} — ce disque ne peut pas être gravé ici.'
+    viewer = 'Ajouter la visionneuse d''images au disque (+ {0})'; stViewer = 'Ajout de la visionneuse… {0} / {1}'
     burn = 'Graver ce CD…'; iso = 'Enregistrer en fichier ISO…'; folder = 'Enregistrer dans un dossier…'
     askBurn = 'Graver {0} examen(s) ({1}) de {2} sur le disque du lecteur {3} ?'
     askFolder = 'Choisissez le dossier (ou la clé USB) où créer la copie'
@@ -71,6 +72,7 @@ $CdxText = @{
     noDisc = '드라이브 {0} — 빈 디스크를 넣으세요.'
     discBlank = '드라이브 {0} — 빈 {1}, {2} 남음'; fits = '  ✔ 이 디스크에 들어갑니다'; tooBig = '  ✘ {0} 넘침: 검사를 줄이거나 DVD를 쓰세요'
     discUsed = '드라이브 {0} — 빈 디스크가 아닙니다. 이 디스크에는 굽지 않습니다.'; discOther = '드라이브 {0} — 이 드라이브로는 구울 수 없는 디스크입니다.'
+    viewer = '디스크에 영상 뷰어도 넣기 (+ {0})'; stViewer = '뷰어를 넣는 중… {0} / {1}'
     burn = '이 CD에 굽기…'; iso = 'ISO 파일로 저장…'; folder = '폴더에 저장…'
     askBurn = '{2} 님의 검사 {0}건({1})을 {3} 드라이브의 디스크에 구울까요?'
     askFolder = '사본을 만들 폴더(또는 USB)를 고르세요'
@@ -120,6 +122,7 @@ $CdxText = @{
     noDisc = 'Burner {0} — insert a blank disc.'
     discBlank = 'Burner {0} — blank {1}, {2} free'; fits = '  ✔ fits on this disc'; tooBig = '  ✘ {0} too much: untick an exam or use a DVD'
     discUsed = 'Burner {0} — this disc is not blank: it will not be used.'; discOther = 'Burner {0} — this disc cannot be written here.'
+    viewer = 'Add the image viewer to the disc (+ {0})'; stViewer = 'Adding the viewer… {0} / {1}'
     burn = 'Burn this CD…'; iso = 'Save as ISO file…'; folder = 'Save to a folder…'
     askBurn = 'Burn {0} exam(s) ({1}) of {2} to the disc in drive {3}?'
     askFolder = 'Choose the folder (or USB stick) where the copy is made'
@@ -158,7 +161,7 @@ $CdxText = @{
   }
 }
 
-$script:Cdx = @{ Lang = 'fr'; T = $CdxText.fr; ConfigPath = ''; Config = $null; Patient = $null; Exams = @(); Busy = $false; Burner = $null; Form = $null }
+$script:Cdx = @{ Lang = 'fr'; T = $CdxText.fr; ConfigPath = ''; Config = $null; Patient = $null; Exams = @(); Busy = $false; Burner = $null; Form = $null; Viewer = $null }
 $script:Ui = @{}
 
 function CdxT([string]$Key) { $v = $script:Cdx.T[$Key]; if ($null -eq $v) { return $Key }; return $v }
@@ -200,7 +203,7 @@ function Set-CdxStatus([string]$Text, [int]$Percent = -1) {
 }
 function Set-CdxBusy([bool]$On) {
   $script:Cdx.Busy = $On
-  foreach ($c in 'Chart', 'Search', 'Grid', 'Burn', 'Iso', 'Folder', 'SignOut') { $script:Ui[$c].Enabled = -not $On }
+  foreach ($c in 'Chart', 'Search', 'Grid', 'Burn', 'Iso', 'Folder', 'SignOut', 'Viewer') { $script:Ui[$c].Enabled = -not $On }
   $script:Ui.Progress.Visible = $On
   if (-not $On) { $script:Ui.Status.Text = ''; $script:Ui.Progress.Style = 'Continuous'; $script:Ui.Progress.Value = 0; Update-CdxSelection }
   [Windows.Forms.Application]::DoEvents()
@@ -272,6 +275,8 @@ function Invoke-CdxSearch {
   Update-CdxSelection
   return $true
 }
+# The viewer goes on the disc: there is one beside the program and its box is ticked.
+function Test-CdxViewer { return ($null -ne $script:Cdx.Viewer -and $script:Ui.Viewer.Checked) }
 function Get-CdxChosen {
   $out = New-Object Collections.Generic.List[object]
   foreach ($row in $script:Ui.Grid.Rows) { if ($row.Cells[0].Value -eq $true -and $row.Tag -and -not [string]$row.Tag.block) { $out.Add($row.Tag) } }
@@ -283,6 +288,7 @@ function Update-CdxSelection {
   $bytes = [long]0; $items = 0
   foreach ($e in $sel) { $bytes += [long]$e.bytes; $items += [int]$e.items }
   $script:Cdx.Need = Get-DiscEstimate $bytes ($items + 2)
+  if (Test-CdxViewer) { $script:Cdx.Need += $script:Cdx.Viewer.bytes + ($script:Cdx.Viewer.files + 200) * 2048 }
   if ($sel.Count) { $script:Ui.Selection.Text = (CdxT 'sel') -f $sel.Count, $items, (Format-Size $bytes (Get-CdxUnit)) } else { $script:Ui.Selection.Text = CdxT 'selNone' }
   $b = $script:Cdx.Burner
   $line = CdxT 'noBurner'; $canBurn = $false
@@ -371,7 +377,10 @@ function Invoke-CdxExport {
       return @{ ok = $false; code = $b.code }
     }
     Set-CdxStatus (CdxT 'stReadme') -1
-    Write-DiscReadme -Dir $b.dir -Patient $p -Clinic $script:Cdx.Patient.clinic -Exams $sel -WithViewer $false
+    $withViewer = Test-CdxViewer
+    Write-DiscReadme -Dir $b.dir -Patient $p -Clinic $script:Cdx.Patient.clinic -Exams $sel -WithViewer $withViewer
+    if ($withViewer) { [void](Add-DiscViewer -Dir $b.dir -ViewerDir $script:Cdx.Viewer.dir -OnFile { param($n, $of) Set-CdxStatus ((CdxT 'stViewer') -f $n, $of) ([int](100 * $n / $of)) }) }
+    $fs = Get-DiscFileSystems $withViewer
     $label = Get-DiscLabel ([string]$p.chart_no)
 
     if ($Medium -eq 'folder') {
@@ -394,7 +403,7 @@ function Invoke-CdxExport {
 
     if ($Medium -eq 'iso') {
       $job = New-Object Bethesda.DiscJob
-      $job.StartIso($b.dir, $label, 3, $Target)
+      $job.StartIso($b.dir, $label, $fs, $Target)
       Wait-CdxJob $job 'stIso'
       if ($job.State -ne 2) {
         if (Test-Path -LiteralPath $Target) { Remove-Item -LiteralPath $Target -Force -ErrorAction SilentlyContinue }   # a half-written image is not left behind
@@ -410,7 +419,7 @@ function Invoke-CdxExport {
     # the disc in the drive
     $files = Get-DiscFiles $b.dir
     $job = New-Object Bethesda.DiscJob
-    $job.StartBurn($b.dir, $label, 3, $burner.id, 'BethesdaCdExport', $false)
+    $job.StartBurn($b.dir, $label, $fs, $burner.id, 'BethesdaCdExport', $false)
     Wait-CdxJob $job 'stBurn'
     if ($job.State -ne 2) {
       Open-DiscTray $burner.id
@@ -436,10 +445,11 @@ function Invoke-CdxExport {
 }
 
 # ── the window ───────────────────────────────────────────────────────────────
-function New-CdxForm([string]$Lang, [string]$ConfigPath) {
+function New-CdxForm([string]$Lang, [string]$ConfigPath, [string]$ViewerDir = '') {
   if (-not $CdxText.ContainsKey($Lang)) { $Lang = 'fr' }
   $script:Cdx.Lang = $Lang; $script:Cdx.T = $CdxText[$Lang]
   $script:Cdx.ConfigPath = $ConfigPath; $script:Cdx.Config = Read-ExportConfig $ConfigPath
+  $script:Cdx.Viewer = Get-ViewerInfo $ViewerDir          # $null when no viewer is beside the program
   [Windows.Forms.Application]::EnableVisualStyles()
   $font = New-Object Drawing.Font('Segoe UI', 10)
   $bold = New-Object Drawing.Font('Segoe UI', 10, [Drawing.FontStyle]::Bold)
@@ -480,7 +490,7 @@ function New-CdxForm([string]$Lang, [string]$ConfigPath) {
   $pl = New-Object Windows.Forms.Label; $pl.Location = New-Object Drawing.Point(14, 86); $pl.Size = New-Object Drawing.Size(872, 24); $pl.Font = $bold; $pl.Anchor = 'Top, Left, Right'; $pl.AutoEllipsis = $true
 
   $grid = New-Object Windows.Forms.DataGridView
-  $grid.Location = New-Object Drawing.Point(14, 116); $grid.Size = New-Object Drawing.Size(872, 330); $grid.Anchor = 'Top, Bottom, Left, Right'
+  $grid.Location = New-Object Drawing.Point(14, 116); $grid.Size = New-Object Drawing.Size(872, 306); $grid.Anchor = 'Top, Bottom, Left, Right'
   $grid.AllowUserToAddRows = $false; $grid.AllowUserToDeleteRows = $false; $grid.AllowUserToResizeRows = $false; $grid.RowHeadersVisible = $false
   $grid.SelectionMode = 'FullRowSelect'; $grid.MultiSelect = $false; $grid.BackgroundColor = [Drawing.Color]::White; $grid.AutoSizeColumnsMode = 'Fill'
   # the line the cursor is on is tinted, not painted over: what counts is the tick
@@ -497,15 +507,20 @@ function New-CdxForm([string]$Lang, [string]$ConfigPath) {
   $grid.Add_CellClick({ param($s, $e)
     if ($e.RowIndex -ge 0 -and $e.ColumnIndex -gt 0) { $cell = $script:Ui.Grid.Rows[$e.RowIndex].Cells[0]; if (-not $cell.ReadOnly) { $cell.Value = -not ($cell.Value -eq $true) } } })
 
-  $selLine = New-Object Windows.Forms.Label; $selLine.Location = New-Object Drawing.Point(14, 454); $selLine.Size = New-Object Drawing.Size(872, 24); $selLine.Anchor = 'Bottom, Left, Right'; $selLine.Font = $bold
-  $drive = New-Object Windows.Forms.Label; $drive.Location = New-Object Drawing.Point(14, 480); $drive.Size = New-Object Drawing.Size(872, 24); $drive.Anchor = 'Bottom, Left, Right'; $drive.AutoEllipsis = $true
+  $selLine = New-Object Windows.Forms.Label; $selLine.Location = New-Object Drawing.Point(14, 430); $selLine.Size = New-Object Drawing.Size(872, 24); $selLine.Anchor = 'Bottom, Left, Right'; $selLine.Font = $bold
+  $drive = New-Object Windows.Forms.Label; $drive.Location = New-Object Drawing.Point(14, 456); $drive.Size = New-Object Drawing.Size(872, 24); $drive.Anchor = 'Bottom, Left, Right'; $drive.AutoEllipsis = $true
+  # offered only when the viewer's folder is beside the program; unticked each time the program starts
+  $viewer = New-Object Windows.Forms.CheckBox; $viewer.Location = New-Object Drawing.Point(16, 482); $viewer.Size = New-Object Drawing.Size(860, 24); $viewer.Anchor = 'Bottom, Left'
+  $viewer.Visible = ($null -ne $script:Cdx.Viewer)
+  if ($script:Cdx.Viewer) { $viewer.Text = (CdxT 'viewer') -f (Format-Size $script:Cdx.Viewer.bytes (Get-CdxUnit)) }
+  $viewer.Add_CheckedChanged({ Update-CdxSelection })
   $mkb = { param($text, $x, $w) $b = New-Object Windows.Forms.Button; $b.Text = $text; $b.Location = New-Object Drawing.Point($x, 512); $b.Size = New-Object Drawing.Size($w, 36); $b.Anchor = 'Bottom, Left'; $b }
   $burn = & $mkb (CdxT 'burn') 14 190; $burn.Font = $bold
   $iso = & $mkb (CdxT 'iso') 214 250
   $folder = & $mkb (CdxT 'folder') 474 270
   $prog = New-Object Windows.Forms.ProgressBar; $prog.Location = New-Object Drawing.Point(14, 562); $prog.Size = New-Object Drawing.Size(300, 20); $prog.Anchor = 'Bottom, Left'; $prog.Visible = $false; $prog.MarqueeAnimationSpeed = 30
   $status = New-Object Windows.Forms.Label; $status.Location = New-Object Drawing.Point(324, 561); $status.Size = New-Object Drawing.Size(562, 24); $status.Anchor = 'Bottom, Left, Right'
-  $mp.Controls.AddRange(@($who, $signOut, $cl, $chart, $search, $pl, $grid, $selLine, $drive, $burn, $iso, $folder, $prog, $status))
+  $mp.Controls.AddRange(@($who, $signOut, $cl, $chart, $search, $pl, $grid, $selLine, $drive, $viewer, $burn, $iso, $folder, $prog, $status))
 
   $signOut.Add_Click({ Invoke-CdxLogout })
   $search.Add_Click({ [void](Invoke-CdxSearch) })
@@ -517,7 +532,7 @@ function New-CdxForm([string]$Lang, [string]$ConfigPath) {
   $form.Controls.Add($mp); $form.Controls.Add($lp)
   $script:Ui = @{ LoginPanel = $lp; MainPanel = $mp; Url = $url; Login = $login; Password = $pw; SignIn = $signIn; LoginMsg = $lmsg
     Who = $who; SignOut = $signOut; Chart = $chart; Search = $search; PatientLine = $pl; Grid = $grid; Selection = $selLine; Drive = $drive
-    Burn = $burn; Iso = $iso; Folder = $folder; Progress = $prog; Status = $status }
+    Burn = $burn; Iso = $iso; Folder = $folder; Progress = $prog; Status = $status; Viewer = $viewer }
 
   $timer = New-Object Windows.Forms.Timer; $timer.Interval = 2000
   $timer.Add_Tick({ if ($script:Ui.MainPanel.Visible) { Update-CdxDrive } })
