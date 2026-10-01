@@ -75,6 +75,7 @@ $T = @{
     listEmpty    = '없음'
     store        = '장비가 영상을 보냄 — AE: {0}'
     received     = '영상 받음 — {0}장 · 보낸 곳 {1} ({2}) · 환자번호 {3} · 검사번호 {4}{5}'
+    corrected    = '영상 {0}장 — EMR에서 다른 오더로 옮긴 영상(장비가 보낸 것이 아님) · 환자번호 {1} · 검사번호 {2}'
     compressed   = ' · 압축 전송({0})'
     privateType  = '  ↳ 제조사 전용 영상 종류({0}) — 서버에 저장했지만 영상 창에서는 안 보일 수 있습니다.'
     noPixels     = '  ↳ 그림이 없는 자료 {0}개(보고서·측정값·원자료 등) — 서버에 저장했지만 영상 창에는 그림이 없습니다.'
@@ -133,6 +134,7 @@ $T = @{
     listEmpty    = 'vide'
     store        = "L'appareil envoie des images — AE : {0}"
     received     = 'Images reçues — {0} · de {1} ({2}) · N° patient {3} · N° accession {4}{5}'
+    corrected    = "{0} image(s) — déplacée(s) sous une autre demande depuis l'EMR (pas envoyée(s) par un appareil) · N° patient {1} · N° accession {2}"
     compressed   = ' · envoi compressé ({0})'
     privateType  = "  ↳ Type d'image propre au fabricant ({0}) — enregistré, mais la Visionneuse peut ne rien afficher."
     noPixels     = "  ↳ {0} objet(s) sans image (rapport, mesures, données brutes…) — enregistré(s), mais rien à afficher dans la Visionneuse."
@@ -191,6 +193,7 @@ $T = @{
     listEmpty    = 'empty'
     store        = 'The device is sending images — AE: {0}'
     received     = 'Images received — {0} · from {1} ({2}) · patient ID {3} · accession {4}{5}'
+    corrected    = '{0} image(s) — put under another order from the EMR (not sent by a device) · patient ID {1} · accession {2}'
     compressed   = ' · compressed ({0})'
     privateType  = '  ↳ Vendor-private image type ({0}) — stored, but the image window may show nothing.'
     noPixels     = '  ↳ {0} object(s) without a picture (report, measurements, raw data…) — stored, but nothing to show in the image window.'
@@ -452,7 +455,10 @@ try {
         } catch { continue }
         $uid = "$($tags.StudyInstanceUID)"
         if (-not $studies.ContainsKey($uid)) {
-          $studies[$uid] = @{ Count = 0; Ae = "$($meta.RemoteAET)"; Ip = "$($meta.RemoteIP)"; Pid = "$($tags.PatientID)"; Acc = "$($tags.AccessionNumber)"; Ts = @{}; First = Get-Date; Private = @{}; NoPixels = 0 }
+          # Made by Orthanc itself from another image (ModifiedFrom), not received from a
+          # device: the EMR put the images of an exam under another order.
+          $studies[$uid] = @{ Count = 0; Ae = "$($meta.RemoteAET)"; Ip = "$($meta.RemoteIP)"; Pid = "$($tags.PatientID)"; Acc = "$($tags.AccessionNumber)"; Ts = @{}; First = Get-Date; Private = @{}; NoPixels = 0
+                              Corrected = [bool]("$($meta.ModifiedFrom)" -and -not "$($meta.RemoteAET)") }
         }
         $g = $studies[$uid]; $g.Count++; $g.Last = Get-Date; $script:lastConnect = Get-Date
         $ts = "$($meta.TransferSyntax)"; if ($tsNames.ContainsKey($ts)) { $g.Ts[$tsNames[$ts]] = $true }
@@ -471,7 +477,13 @@ try {
       if (((Get-Date) - $g.Last).TotalSeconds -lt 5) { continue }
       $studies.Remove($uid)
       $comp = if ($g.Ts.Count) { $T.compressed -f (($g.Ts.Keys) -join ', ') } else { '' }
-      Say ($T.received -f $g.Count, $g.Ae, $g.Ip, $(if ($g.Pid) { $g.Pid } else { $T.noPid }), $(if ($g.Acc) { $g.Acc } else { $T.noPid }), $comp) 'Cyan'
+      if ($g.Corrected) {
+        # The temporary study an exchange of two orders goes through says nothing to anyone.
+        if ($g.Acc -like 'TMP-*') { continue }
+        Say ($T.corrected -f $g.Count, $(if ($g.Pid) { $g.Pid } else { $T.noPid }), $(if ($g.Acc) { $g.Acc } else { $T.noPid })) 'Cyan'
+      } else {
+        Say ($T.received -f $g.Count, $g.Ae, $g.Ip, $(if ($g.Pid) { $g.Pid } else { $T.noPid }), $(if ($g.Acc) { $g.Acc } else { $T.noPid }), $comp) 'Cyan'
+      }
       if ($g.Private.Count) { Note ($T.privateType -f (($g.Private.Keys) -join ', ')) 'Yellow' }
       if ($g.NoPixels) { Note ($T.noPixels -f $g.NoPixels) 'Yellow' }
       if (-not $emrHere) { Note ($T.noEmr -f $EmrDbContainer) 'DarkGray'; continue }

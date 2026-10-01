@@ -16,12 +16,23 @@
 #
 # At the end it also counts EMR imaging orders recorded as "images arrived"
 # whose study Orthanc does not have - the number that should be 0 afterwards.
+#
+# Images a doctor put under another order in the EMR ("Corriger la demande..."): the
+# files under the old study number must not come back. Those the nightly backup already
+# set aside are in <disk>\BethesdaPACS\replaced and are never uploaded. For a disk that
+# has not had a backup since the correction, the EMR is asked (it must be restored and
+# running first - the usual order) and the files are set aside before the upload; any
+# such image already in Orthanc is removed from it. A file is set aside (or an image
+# removed) only when its replacement is there too: if the disk holds a picture only
+# under its old study number - no backup ran after the correction - it is uploaded as
+# it is, and said, rather than lost.
 param(
   [switch]$Verify,
   [string]$OrthancUrl = 'http://localhost:9090',
   [string]$EnvFile = (Join-Path $PSScriptRoot '.env'),
   [string[]]$SearchRoots = @(),
   [string]$EmrDbContainer = 'bethesda-emr-db',
+  [string]$EmrSupersededUrl = 'http://localhost:9080/api/pacs/superseded-images',
   [int]$Sample = 20
 )
 $ErrorActionPreference = 'Continue'
@@ -34,9 +45,70 @@ $headers = Get-OrthancHeaders $cfg['ORTHANC_PASSWORD']
 
 $disks = @(Find-BackupDisks $SearchRoots)
 if ($disks.Count -ne 1) { Write-Host ("Need exactly one backup disk plugged in; found " + $disks.Count + '.'); exit 2 }
-$images = Join-Path $disks[0] "$BackupDirName\images"
+$base = Join-Path $disks[0] $BackupDirName
+$images = Join-Path $base 'images'
+$asideBefore = @(Get-ChildItem (Join-Path $base $ReplacedDirName) -Recurse -Filter '*.dcm' -ErrorAction SilentlyContinue).Count
+
+# Images put under another order in the EMR since they were backed up (see the header).
+$gone = Get-SupersededImages $EmrSupersededUrl $cfg['BRIDGE_TOKEN']
+# A line put into the EMR by hand without image numbers ("every file under this study
+# number") is left to the nightly backup, which asks Orthanc about each file. Here Orthanc
+# is being rebuilt and cannot be asked, and that number may hold a later exam as well.
+if ($null -ne $gone) {
+  $byHand = @($gone | Where-Object { $_.all }).Count
+  $gone = @($gone | Where-Object { -not $_.all })
+  if ($byHand -gt 0 -and -not $Verify) { Write-Host "($byHand study number(s) registered by hand without image numbers: left as they are - the nightly backup handles them.)" }
+}
+if (-not $Verify) {
+  if ($null -eq $gone) {
+    Write-Host "WARNING: could not ask the EMR which images were put under another order ($EmrSupersededUrl)." -ForegroundColor Yellow
+    Write-Host "  If any were since this disk's last backup, the old studies come back. Start the EMR and run this again: it removes them." -ForegroundColor Yellow
+  } elseif ($gone.Count -gt 0) {
+    $res = Move-SupersededFiles $base $gone $null
+    if ($res.moved -gt 0) { Write-Host "Set aside $($res.moved) image file(s) whose images were put under another order in the EMR (kept in $ReplacedDirName, not uploaded)." }
+    if ($res.kept -gt 0) {
+      Write-Host "WARNING: $($res.kept) image(s) that were put under another order in the EMR are on this disk only under their OLD study number" -ForegroundColor Yellow
+      Write-Host "  (no backup ran after the correction). They are uploaded as they are, so that the pictures are not lost. In the EMR," -ForegroundColor Yellow
+      Write-Host "  the exam they were moved to will say the image server does not have its images: call for help (README, Image backup)." -ForegroundColor Yellow
+    }
+  }
+}
 $files = @(Get-ChildItem $images -Recurse -Filter '*.dcm' -ErrorAction SilentlyContinue)
-Write-Host "Backup disk $($disks[0]): $($files.Count) image files."
+Write-Host "Backup disk $($disks[0]): $($files.Count) image files$(if ($asideBefore) { " (+ $asideBefore set aside in $ReplacedDirName)" })."
+
+# The listed images that Orthanc holds (uploaded by an earlier run that could not ask
+# the EMR): removed from Orthanc. Only exact matches of study number and image number.
+function Remove-SupersededFromOrthanc($items) {
+  $removed = 0
+  foreach ($it in @($items)) {
+    $uid = [string]$it.study_uid
+    if (-not (Test-Uid $uid)) { continue }
+    try {
+      $q = @{ Level = 'Instance'; Query = @{ StudyInstanceUID = $uid }; Expand = $true } | ConvertTo-Json
+      # (Assigned first: Windows PowerShell hands a JSON array down the pipeline as ONE
+      # object, so @(Invoke-RestMethod ...) would be a list of one list.)
+      $found = Invoke-RestMethod -Method Post -Uri "$OrthancUrl/tools/find" -Headers $headers -UseBasicParsing -ContentType 'application/json' -Body $q -TimeoutSec 60 -ErrorAction Stop
+    } catch { continue }
+    foreach ($h in @($found)) {
+      $sop = [string]$h.MainDicomTags.SOPInstanceUID
+      if (-not $it.all -and (@($it.instances) -notcontains $sop)) { continue }
+      # Only when the picture is in Orthanc under another study number too.
+      try {
+        if ($it.all) {
+          $by = [string]$it.replaced_by
+          if (-not (Test-Uid $by)) { continue }
+          $q2 = @{ Level = 'Study'; Query = @{ StudyInstanceUID = $by } } | ConvertTo-Json
+        } else {
+          $q2 = @{ Level = 'Instance'; Query = @{ SOPInstanceUID = $sop } } | ConvertTo-Json
+        }
+        $others = Invoke-RestMethod -Method Post -Uri "$OrthancUrl/tools/find" -Headers $headers -UseBasicParsing -ContentType 'application/json' -Body $q2 -TimeoutSec 60 -ErrorAction Stop
+        if (@($others).Count -lt $(if ($it.all) { 1 } else { 2 })) { continue }
+      } catch { continue }
+      try { Invoke-RestMethod -Method Delete -Uri "$OrthancUrl/instances/$($h.ID)" -Headers $headers -UseBasicParsing -TimeoutSec 60 -ErrorAction Stop | Out-Null; $removed++ } catch { }
+    }
+  }
+  return $removed
+}
 
 function Get-OrthancCount {
   try { return [int](Invoke-RestMethod -Uri "$OrthancUrl/statistics" -Headers $headers -UseBasicParsing -ErrorAction Stop).CountInstances }
@@ -79,6 +151,18 @@ if ($Verify) {
     if ($files.Count -lt $inOrthanc) { Write-Host "  WARNING: fewer on the disk than in Orthanc - last night's backup may not have run." -ForegroundColor Yellow; $bad++ }
   }
   Show-EmrLinks
+  # Files still under the study number of images that were since put under another order:
+  # the next nightly backup (or a restore) sets them aside. Told, not counted as bad.
+  if ($null -ne $gone -and $gone.Count -gt 0) {
+    $left = 0
+    foreach ($it in $gone) {
+      $d = Join-Path $images ([string]$it.study_uid)
+      if (-not (Test-Uid ([string]$it.study_uid)) -or -not (Test-Path $d)) { continue }
+      if ($it.all) { $left += @(Get-ChildItem $d -Filter '*.dcm' -ErrorAction SilentlyContinue).Count }
+      else { foreach ($s in @($it.instances)) { if ((Test-Uid ([string]$s)) -and (Test-Path (Join-Path $d ("$s.dcm")))) { $left++ } } }
+    }
+    if ($left -gt 0) { Write-Host "$left image file(s) on the disk belong to exams since put under another order in the EMR; the next backup sets them aside." }
+  }
   # The EMR database backups copied by image-backup.ps1 (emr-backups). This script
   # does not restore them: copy the chosen file into the EMR's backups folder and
   # follow the EMR's DEPLOYMENT.md section 5b.
@@ -106,6 +190,10 @@ foreach ($f in $files) {
       -ContentType 'application/dicom' -InFile $f.FullName -TimeoutSec 120 -ErrorAction Stop
     if ([string]$r.Status -eq 'AlreadyStored') { $already++ } else { $stored++ }
   } catch { $failed++; Write-Host "  could not upload $($f.Name): $($_.Exception.Message)" }
+}
+if ($null -ne $gone -and $gone.Count -gt 0) {
+  $removed = Remove-SupersededFromOrthanc $gone
+  if ($removed -gt 0) { Write-Host "Removed from Orthanc $removed image(s) that the EMR had put under another order (an earlier upload brought them back)." }
 }
 $after = Get-OrthancCount
 Write-Host "Uploaded: $stored new, $already already there, $failed failed. Orthanc images: $before -> $after."

@@ -14,6 +14,10 @@
 # change handled is kept ON THE DISK (state.json), so a fresh disk simply gets
 # everything. Nothing on the disk is ever deleted, even if Orthanc deletes it.
 #
+# One thing is moved, not deleted: when a doctor put the images of an exam under another
+# order in the EMR, the files under the old study number go to <disk>\BethesdaPACS\replaced
+# (see image-backup-common.ps1) so that a restore does not bring the wrong study back.
+#
 # The same run also copies the EMR's nightly database backups (*.sql.gz) to
 # <disk>\BethesdaPACS\emr-backups - one external disk for both. That part is
 # reported separately (emr_backup*): it never turns the image result red, and an
@@ -24,6 +28,7 @@
 param(
   [string]$OrthancUrl = 'http://localhost:9090',
   [string]$EmrReportUrl = 'http://localhost:9080/api/pacs/image-backup-report',
+  [string]$EmrSupersededUrl = '',    # default: the same EMR, .../superseded-images
   [string]$EnvFile = (Join-Path $PSScriptRoot '.env'),
   [string]$EmrPath = '',             # the EMR folder; default: Bethesda-EMR* beside this folder
   [string[]]$SearchRoots = @(),       # tests: folders to treat as disks
@@ -190,6 +195,14 @@ if ($seq -gt 0) {
 }
 Log "start: disk $($script:root), from change $seq"
 
+function Save-State {
+  Write-JsonAtomically $statePath ([ordered]@{
+    last_seq = $seq; last_change = $lastChange; total_files = $script:totalFiles
+    last_success = (Get-Date).ToString('o')
+    note = 'Written by image-backup.ps1. last_seq = Orthanc change already copied; last_change = that change (seq|type|id|date), to tell this Orthanc from another.'
+  })
+}
+
 $copied = 0; $failed = 0
 while ($true) {
   try {
@@ -244,12 +257,36 @@ while ($true) {
   if ($pageChanges.Count -gt 0) {
     $seq = [int64]$pageChanges[-1].Seq; $lastChange = Get-ChangeMark $pageChanges[-1]
   }
-  Write-JsonAtomically $statePath ([ordered]@{
-    last_seq = $seq; last_change = $lastChange; total_files = $script:totalFiles
-    last_success = (Get-Date).ToString('o')
-    note = 'Written by image-backup.ps1. last_seq = Orthanc change already copied; last_change = that change (seq|type|id|date), to tell this Orthanc from another.'
-  })
+  Save-State
   if ($page.Done) { break }
+}
+
+# Images put under another order in the EMR: the files under the old study number are
+# set aside (never deleted). The EMR says which; Orthanc is asked once more for each, and
+# a file whose image it still has under that number stays. An EMR that cannot be asked
+# changes nothing tonight - the next run does it. Tests (-NoReport) ask only when told where.
+if ($failed -eq 0 -and $script:root -and (Test-Path (Join-Path $script:root $MarkerName))) {
+  $supUrl = if ($EmrSupersededUrl) { $EmrSupersededUrl } elseif (-not $NoReport) { $EmrReportUrl -replace 'image-backup-report$', 'superseded-images' } else { '' }
+  if ($supUrl) {
+    $gone = Get-SupersededImages $supUrl $cfg['BRIDGE_TOKEN']
+    if ($null -eq $gone) { Log 'could not ask the EMR which images were put under another order; nothing set aside this run' }
+    elseif ($gone.Count -gt 0) {
+      $inOrthanc = {
+        param($uid, $sop)
+        try {
+          $hit = Invoke-RestMethod -Method Post -Uri "$OrthancUrl/tools/find" -Headers $headers -UseBasicParsing -ContentType 'application/json' -TimeoutSec 30 -ErrorAction Stop `
+            -Body (@{ Level = 'Instance'; Query = @{ StudyInstanceUID = $uid; SOPInstanceUID = $sop } } | ConvertTo-Json)
+          return (@($hit).Count -gt 0)
+        } catch { return $true }      # cannot tell: leave the file where it is
+      }
+      $aside = (Move-SupersededFiles $base $gone $inOrthanc).moved
+      if ($aside -gt 0) {
+        $script:totalFiles = [math]::Max(0, $script:totalFiles - $aside)
+        Save-State
+        Log "set aside $aside image file(s) whose images were put under another order in the EMR (in $ReplacedDirName, not deleted)"
+      }
+    }
+  }
 }
 
 if ($failed -gt 0) { Finish $false $true $copied $failed "$failed image(s) could not be copied; will retry next run" 1 }

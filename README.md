@@ -147,7 +147,8 @@ connection test (C-ECHO), a worklist query and how many patients it got — and 
 0 (the device filters on its own AE, on another modality, on another date, or there is nothing
 for today) — images received (patient ID, accession, compression) and whether they match an EMR
 order (same patient ID, different ID, no ID, linked by accession, no order), then when the EMR
-records them. A device that connects and leaves without asking or sending anything is reported
+records them. Images the EMR put under another order are told apart ("put under another order
+from the EMR (not sent by a device)"). A device that connects and leaves without asking or sending anything is reported
 too: that is what the PACS shows when it did not accept the image type or transfer mode. Images
 of a vendor-private type, or objects without a picture, are flagged ("stored, but the image window
 may show nothing"). Of Orthanc's own warnings it shows only those from its DICOM threads (a
@@ -230,6 +231,20 @@ on the same disk (checked by hash and as a complete gzip; the disk keeps the EMR
 30 days, never fewer than the newest 7). The EMR folder is found beside this one
 (`Bethesda-EMR*`), or pass `-EmrPath`. To restore one, copy it into the EMR's `backups`
 folder and follow the EMR's `DEPLOYMENT.md` section 5b.
+
+**Images put under another order in the EMR.** When an exam was done with the wrong line
+of the same patient picked on the device, a doctor corrects it in the EMR (*Corriger la
+demande…*): the image server gets a corrected study and the original is deleted there.
+The files of the original would bring the wrong study back at a restore, so the nightly
+backup asks the EMR which images those are and **sets their files aside** in
+`BethesdaPACS\replaced\<date>\` - moved, not deleted, and only once the corrected images
+are on the disk too. `restore-image-backup.ps1` never uploads that folder. If the disk is
+restored before a backup has run since the correction, the restore asks the EMR itself
+(restore and start the EMR first, as usual); pictures the disk holds only under their old
+study number are uploaded as they are and the script says so, rather than lose them - the
+exam they were moved to then shows no images in the EMR, and the correction has to be
+looked at by whoever supports the installation. The `replaced` folder can be cleared by
+hand once the corrected studies have been checked in the viewer.
 
 **The disk holds patient images and the whole EMR database, unencrypted.** Keep it
 locked away, and never lend it or use it for anything else.
@@ -323,7 +338,9 @@ Please open an **Issue** on this repository (or on the main
   modify freely, **no redistribution** — same terms as Bethesda EMR. See [LICENSE](LICENSE).
 - **Orthanc** is **not** part of this repository. It is pulled as an official Docker image and is
   licensed by its authors under the **GNU AGPLv3**. This project uses Orthanc as-is (unmodified)
-  and does not distribute it.
+  and does not distribute it. The clinic's own images may be corrected through Orthanc's REST API
+  (the EMR renames a study that was taken under the wrong order, `POST /studies/{id}/modify`, and
+  deletes the original); that is using Orthanc, not changing it.
 - **The Stone Web Viewer** (it comes inside the Orthanc image, AGPLv3 as well) is not modified
   either. Bethesda EMR shows it to staff through its own address and passes on, byte for byte, what
   Orthanc serves; it uses Stone's own URL parameters only (`?study=…`), changes none of Stone's

@@ -116,6 +116,79 @@ function Test-GzipFile([string]$path) {
   } catch { return $false } finally { if ($gz) { $gz.Dispose() }; if ($fs) { $fs.Dispose() } }
 }
 
+# -- images the EMR put under another order ("Corriger la demande...", EMR pacs.move.js) --
+#
+# The disk keeps one file per image under its study number:
+# images\<StudyInstanceUID>\<SOPInstanceUID>.dcm. When a doctor moves the images of an
+# exam to the right order, the image server gets a corrected study (new number, same
+# images) and the original is deleted there. The files under the old number are still
+# on the disk; restored, they would bring the wrong study back. The EMR knows which
+# they are (GET /api/pacs/superseded-images, bridge token: study and image numbers
+# only). They are not deleted - they are set aside, in
+# <disk>\BethesdaPACS\replaced\<date>\<StudyInstanceUID>\, which a restore never uploads.
+# A file is set aside only when its replacement is on the disk too - the same image
+# number under another study number (a correction keeps the image numbers) - so the
+# disk never loses its only copy of a picture.
+$ReplacedDirName = 'replaced'
+
+# The EMR's list: an array of { study_uid, all, instances, replaced_by } (possibly empty), or $null
+# when it cannot be asked (EMR down, an EMR from before this feature, no token).
+function Get-SupersededImages([string]$url, [string]$token) {
+  if (-not $url -or -not $token) { return $null }
+  try {
+    $r = Invoke-RestMethod -Uri $url -Headers @{ 'X-Bridge-Token' = $token } -UseBasicParsing -TimeoutSec 20 -ErrorAction Stop
+    if ($null -eq $r -or $null -eq $r.PSObject.Properties['items']) { return $null }
+    return ,@($r.items | Where-Object { $_ })
+  } catch { return $null }
+}
+
+# Is the image `sop` on the disk under another study number than `uid`?
+function Test-ReplacementOnDisk([string]$images, [string]$uid, [string]$sop, [string]$replacedBy) {
+  if ($replacedBy -and (Test-Uid $replacedBy) -and $replacedBy -ne $uid -and (Test-Path (Join-Path (Join-Path $images $replacedBy) ($sop + '.dcm')))) { return $true }
+  foreach ($d in @(Get-ChildItem $images -Directory -ErrorAction SilentlyContinue)) {
+    if ($d.Name -ne $uid -and (Test-Path (Join-Path $d.FullName ($sop + '.dcm')))) { return $true }
+  }
+  return $false
+}
+
+# Move the listed files from <base>\images to <base>\replaced\<today>. $stillThere, when
+# given, is asked for each (study number, image number): $true = the image server still
+# has that image under that number, leave the file. Returns @{ moved; kept } - kept =
+# listed files left in place because the disk has no replacement for them.
+function Move-SupersededFiles([string]$base, $items, [scriptblock]$stillThere) {
+  $images = Join-Path $base 'images'
+  $moved = 0; $kept = 0
+  foreach ($it in @($items)) {
+    $uid = [string]$it.study_uid
+    if (-not (Test-Uid $uid)) { continue }
+    $dir = Join-Path $images $uid
+    if (-not (Test-Path $dir)) { continue }
+    $names = if ($it.all) { @(Get-ChildItem $dir -Filter '*.dcm' -ErrorAction SilentlyContinue | ForEach-Object { $_.BaseName }) } else { @($it.instances) }
+    foreach ($sop in $names) {
+      $sop = [string]$sop
+      if (-not (Test-Uid $sop)) { continue }
+      $file = Join-Path $dir ($sop + '.dcm')
+      if (-not (Test-Path $file)) { continue }
+      if ($stillThere -and (& $stillThere $uid $sop)) { continue }
+      # By hand (all): the replacement has other image numbers - its folder must be there.
+      $by = [string]$it.replaced_by
+      $has = if ($it.all) { [bool]($by -and (Test-Uid $by) -and $by -ne $uid -and @(Get-ChildItem (Join-Path $images $by) -Filter '*.dcm' -ErrorAction SilentlyContinue).Count) }
+             else { Test-ReplacementOnDisk $images $uid $sop $by }
+      if (-not $has) { $kept++; continue }
+      $destDir = Join-Path (Join-Path (Join-Path $base $ReplacedDirName) (Get-Date -Format 'yyyy-MM-dd')) $uid
+      New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+      $dest = Join-Path $destDir ($sop + '.dcm')
+      try {
+        if (Test-Path $dest) { Remove-Item $dest -Force -ErrorAction Stop }
+        Move-Item $file $dest -ErrorAction Stop
+        $moved++
+      } catch { }
+    }
+    if (-not @(Get-ChildItem $dir -Force -ErrorAction SilentlyContinue).Count) { Remove-Item $dir -Force -ErrorAction SilentlyContinue }
+  }
+  return @{ moved = $moved; kept = $kept }
+}
+
 function Write-JsonAtomically([string]$path, $obj) {
   $path = [IO.Path]::GetFullPath($path)
   $tmp = $path + '.tmp'
