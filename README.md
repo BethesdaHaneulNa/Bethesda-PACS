@@ -324,6 +324,11 @@ Please open an **Issue** on this repository (or on the main
 - **Orthanc** is **not** part of this repository. It is pulled as an official Docker image and is
   licensed by its authors under the **GNU AGPLv3**. This project uses Orthanc as-is (unmodified)
   and does not distribute it.
+- **The Stone Web Viewer** (it comes inside the Orthanc image, AGPLv3 as well) is not modified
+  either. Bethesda EMR shows it to staff through its own address and passes on, byte for byte, what
+  Orthanc serves; it uses Stone's own URL parameters only (`?study=…`), changes none of Stone's
+  files and adds no code to its pages. If a change to Orthanc or Stone ever became necessary, it
+  would be raised first — it would bring the AGPL's source-offer duty with it.
 
 Companion to **[Bethesda EMR](https://github.com/BethesdaHaneulNa/Bethesda-EMR)**.
 Built with Claude (vibe coding).
