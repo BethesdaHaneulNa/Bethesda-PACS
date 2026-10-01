@@ -241,10 +241,14 @@ backup asks the EMR which images those are and **sets their files aside** in
 are on the disk too. `restore-image-backup.ps1` never uploads that folder. If the disk is
 restored before a backup has run since the correction, the restore asks the EMR itself
 (restore and start the EMR first, as usual); pictures the disk holds only under their old
-study number are uploaded as they are and the script says so, rather than lose them - the
-exam they were moved to then shows no images in the EMR, and the correction has to be
-looked at by whoever supports the installation. The `replaced` folder can be cleared by
-hand once the corrected studies have been checked in the viewer.
+study number are uploaded as they are and the script says so, rather than lose them. Nothing
+has to be done by hand then: the next time that patient's images are opened in the EMR, the
+EMR sees that the image server is back in the state before the correction and makes the
+correction again there (and writes a line in its change log, "Re-applied after a restore").
+It does so only when everything matches what it recorded; if an exam keeps saying that the
+image server does not have its images, the pictures are still on the server under the old
+study number - call whoever supports the installation. The `replaced` folder can be cleared
+by hand once the corrected studies have been checked in the viewer.
 
 **The disk holds patient images and the whole EMR database, unencrypted.** Keep it
 locked away, and never lend it or use it for anything else.

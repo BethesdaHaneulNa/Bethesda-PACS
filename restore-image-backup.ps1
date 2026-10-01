@@ -25,7 +25,8 @@
 # such image already in Orthanc is removed from it. A file is set aside (or an image
 # removed) only when its replacement is there too: if the disk holds a picture only
 # under its old study number - no backup ran after the correction - it is uploaded as
-# it is, and said, rather than lost.
+# it is, and said, rather than lost; the EMR then makes the correction again on the
+# image server when that patient's images are next opened.
 param(
   [switch]$Verify,
   [string]$OrthancUrl = 'http://localhost:9090',
@@ -68,8 +69,9 @@ if (-not $Verify) {
     if ($res.moved -gt 0) { Write-Host "Set aside $($res.moved) image file(s) whose images were put under another order in the EMR (kept in $ReplacedDirName, not uploaded)." }
     if ($res.kept -gt 0) {
       Write-Host "WARNING: $($res.kept) image(s) that were put under another order in the EMR are on this disk only under their OLD study number" -ForegroundColor Yellow
-      Write-Host "  (no backup ran after the correction). They are uploaded as they are, so that the pictures are not lost. In the EMR," -ForegroundColor Yellow
-      Write-Host "  the exam they were moved to will say the image server does not have its images: call for help (README, Image backup)." -ForegroundColor Yellow
+      Write-Host "  (no backup ran after the correction). They are uploaded as they are, so that the pictures are not lost." -ForegroundColor Yellow
+      Write-Host "  Nothing to do by hand: the EMR puts them under the right order again the next time that patient's images are opened" -ForegroundColor Yellow
+      Write-Host "  (wait a minute after this restore; if an exam still says the image server does not have its images, see README, Image backup)." -ForegroundColor Yellow
     }
   }
 }
