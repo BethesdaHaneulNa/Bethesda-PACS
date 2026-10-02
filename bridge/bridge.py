@@ -15,6 +15,8 @@ from pydicom.uid import generate_uid, ExplicitVRLittleEndian
 FEED_URL = os.environ.get("EMR_FEED_URL", "http://host.docker.internal:9080/api/pacs/worklist-feed")
 TOKEN    = os.environ.get("BRIDGE_TOKEN", "")
 WL_DIR   = os.environ.get("WL_DIR", "/worklists")
+# The image server's store, mounted read-only: only its disk's free room is read.
+STORAGE_DIR = os.environ.get("STORAGE_DIR", "/storage")
 POLL     = int(os.environ.get("POLL_SECONDS", "15"))
 
 MWL_SOP_CLASS = "1.2.840.10008.5.1.4.31"  # Modality Worklist Information Model - FIND
@@ -97,9 +99,9 @@ def report(ok, synced=0, failed=0, error=""):
             "error": scrub(error)[:500],
             "poll_seconds": POLL,
             "arrivals_error": scrub(arrivals_error)[:300],
-            # Room on the disk the image server stores on: the worklist folder this bridge
-            # writes to is on that disk (./worklists beside ./storage). The EMR refuses to
-            # bring a disc's images in when they would fill it.
+            # Room on the disk the image server stores on (the store may be on another
+            # drive than this folder: ORTHANC_STORAGE_PATH). The EMR refuses to bring a
+            # disc's images in when they would fill it.
             "storage_free_bytes": storage_room()[0],
             "storage_total_bytes": storage_room()[1],
         })
@@ -109,8 +111,10 @@ def report(ok, synced=0, failed=0, error=""):
 
 
 def storage_room():
+    # An old compose file does not mount the store: the worklist folder is then on the
+    # same disk as ./storage.
     try:
-        u = shutil.disk_usage(WL_DIR)
+        u = shutil.disk_usage(STORAGE_DIR if os.path.isdir(STORAGE_DIR) else WL_DIR)
         return int(u.free), int(u.total)
     except Exception:
         return 0, 0

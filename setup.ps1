@@ -4,9 +4,14 @@
 #
 #   .\setup.ps1            normal install (pulls/builds; needs internet)
 #   .\setup.ps1 -Offline   use images already loaded from the offline kit; never builds
-param([switch]$Offline)
+#   .\setup.ps1 -StoragePath D:\Bethesda-PACS-images
+#                          first installation: keep the images there, without asking.
+#                          Without it the first installation asks (Enter = .\storage here).
+#                          An installed PACS is moved with move-image-storage.ps1 instead.
+param([switch]$Offline, [string]$StoragePath = '')
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
+. (Join-Path $PSScriptRoot 'image-storage-common.ps1')
 
 function New-Secret([int]$bytes) {
   $b = New-Object byte[] $bytes
@@ -27,8 +32,30 @@ BRIDGE_TOKEN=$bridgeToken
 # EMR_FEED_URL=http://host.docker.internal:9080/api/pacs/worklist-feed
 "@ | Out-File -FilePath .env -Encoding ascii
   Write-Host ".env created. Orthanc login: user 'admin', password is in .env (ORTHANC_PASSWORD)."
+  # Where the images go: asked once, now (a person at the keyboard), or given with
+  # -StoragePath. The folder is made and gets its marker; the image server will not
+  # start on a folder without it (docker-compose.yml).
+  $canAsk = [Environment]::UserInteractive -and -not [Console]::IsInputRedirected
+  try { $store = Initialize-ImageStorage $PSScriptRoot (Join-Path $PSScriptRoot '.env') $StoragePath $canAsk }
+  catch {
+    Write-Host ("The image store could not be prepared: " + $_.Exception.Message) -ForegroundColor Red
+    Remove-Item .env -Force      # so that the next run is a first installation again and asks again
+    exit 1
+  }
+  Write-Host "Images will be kept in: $store"
 } else {
   Write-Host ".env already exists - keeping current secrets."
+  if ($StoragePath) { Write-Host "-StoragePath is for the first installation only. To move the images of an installed PACS: .\move-image-storage.ps1 -To <folder>" -ForegroundColor Yellow }
+  # Is the image store where .env says? If its disk is missing, do not start anything:
+  # Docker would make an empty folder there.
+  $missing = Confirm-ImageStorage $PSScriptRoot (Join-Path $PSScriptRoot '.env')
+  if ($missing) {
+    Write-Host ''
+    Write-Host '===================================================================' -ForegroundColor Red
+    foreach ($l in ($missing -split "`n")) { Write-Host (' ' + $l) -ForegroundColor Red }
+    Write-Host '===================================================================' -ForegroundColor Red
+    exit 1
+  }
 }
 
 # From here on, docker's own stderr must not stop the script: Windows PowerShell

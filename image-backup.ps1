@@ -38,6 +38,7 @@ param(
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot 'image-backup-common.ps1')
+. (Join-Path $PSScriptRoot 'image-storage-common.ps1')
 
 $cfg = Read-PacsEnv $EnvFile
 $headers = Get-OrthancHeaders $cfg['ORTHANC_PASSWORD']
@@ -161,6 +162,10 @@ $disks = @(Find-BackupDisks $SearchRoots)
 if ($disks.Count -eq 0) { Finish $false $false 0 0 'backup disk not found (is it plugged in?)' 2 }
 if ($disks.Count -gt 1) { Finish $false $true 0 0 ('more than one backup disk plugged in: ' + ($disks -join ', ')) 1 }
 $script:root = $disks[0]
+# A backup on the physical disk that holds the image store is lost with it. The copy is
+# still made; the report says so every night until the disk is another one.
+$sameDisk = $false
+try { $sameDisk = ((Test-SamePhysicalDisk $script:root (Get-ImageStoragePath $PSScriptRoot $EnvFile)) -eq $true) } catch { }
 $base = Join-Path $script:root $BackupDirName
 $images = Join-Path $base 'images'
 New-Item -ItemType Directory -Force -Path $images | Out-Null
@@ -293,5 +298,8 @@ if ($failed -gt 0) { Finish $false $true $copied $failed "$failed image(s) could
 $space = Get-FreeSpace $script:root
 if ($space.total -gt 0 -and ($space.free / $space.total) -lt 0.10) {
   Finish $true $true $copied 0 ('backup disk almost full - ' + [math]::Round($space.free / 1GB, 1) + ' GB free') 0
+}
+if ($sameDisk -and $SearchRoots.Count -eq 0) {
+  Finish $true $true $copied 0 'the backup disk is the same physical disk as the image store - if it fails, both are lost. Use another disk.' 0
 }
 Finish $true $true $copied 0 '' 0

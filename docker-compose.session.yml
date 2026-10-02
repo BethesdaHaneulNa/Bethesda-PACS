@@ -11,6 +11,7 @@
 #
 # - ports only on 127.0.0.1, never 9090 or 4242 (a device must not reach it)
 # - images and worklist files in named volumes, not ./storage / ./worklists
+#   (ORTHANC_STORAGE_PATH is not used here)
 # - the bridge is built under its own tag, so the clinic's image keeps its name
 # - the bridge joins the EMR session stack's network (bethesda-s-pacs_default)
 #   and reads that EMR's feed; start the EMR session stack first
@@ -22,6 +23,10 @@
 services:
   orthanc:
     container_name: bethesda-s-pacs-orthanc
+    # The session's store is a named volume that starts empty: the check for the image
+    # store's marker (docker-compose.yml) is for a real disk. Orthanc's own entrypoint.
+    entrypoint: ["/docker-entrypoint.sh"]
+    command: ["/tmp/orthanc.json"]
     ports: !override
       - "127.0.0.1:${SESSION_PACS_WEB_PORT:-9198}:8042"
       - "127.0.0.1:${SESSION_PACS_DICOM_PORT:-11298}:4242"
@@ -36,6 +41,7 @@ services:
       EMR_FEED_URL: "${SESSION_EMR_FEED_URL:-http://backend:3000/api/pacs/worklist-feed}"
     volumes: !override
       - session-worklists:/worklists
+      - session-storage:/storage:ro
     networks:
       - default
       - emr-session

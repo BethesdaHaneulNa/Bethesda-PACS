@@ -36,6 +36,24 @@ else
   echo ".env already exists — keeping current secrets."
 fi
 
+# The image store: ORTHANC_STORAGE_PATH in .env, or ./storage. The image server does not
+# start on a folder that has neither the marker nor an image index (docker-compose.yml):
+# a first installation makes the folder and the marker here; later, a missing store is said.
+STORE="$(sed -n 's/^ORTHANC_STORAGE_PATH=//p' .env | tail -n 1)"
+STORE="${STORE:-./storage}"
+if [ -n "$BRIDGE_TOKEN" ]; then
+  mkdir -p "$STORE"
+  [ -f "$STORE/BETHESDA-PACS-STORAGE.id" ] || {
+    echo "Bethesda PACS image store"
+    echo "created=$(date '+%Y-%m-%d %H:%M')"
+    echo "Do not delete this file or anything in this folder."
+  } > "$STORE/BETHESDA-PACS-STORAGE.id"
+elif [ ! -f "$STORE/BETHESDA-PACS-STORAGE.id" ] && [ ! -f "$STORE/index" ]; then
+  echo "The image store is not where it should be: $STORE"
+  echo "Is its disk mounted? The image server is NOT started on an empty folder."
+  exit 1
+fi
+
 if [ -n "$OFFLINE" ]; then
   echo "Offline mode: starting from pre-loaded images (no build, no downloads)."
   docker compose up -d --no-build

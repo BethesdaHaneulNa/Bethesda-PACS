@@ -7,6 +7,16 @@ the two change together, and an EMR at 1.5.0 expects this PACS. The EMR's change
 (section *Imaging (PACS)*) tells the whole story from the doctor's side; this is the PACS
 folder's part of it.
 
+**The images can live on a drive of their own.** `ORTHANC_STORAGE_PATH` in `.env` names the
+folder (setup asks at the first installation; not set = `storage\` here, as before), and
+`move-image-storage.ps1` moves an existing store there: stop, copy, compare, start, check
+that the image server holds what it held, keep the old folder under another name. The
+store carries a marker file and the image server does not start on a folder that has
+neither the marker nor an image index - when the store's disk is missing, Docker Desktop
+makes an empty folder of that name, and an image server started on it would look healthy
+and hold nothing. The bridge reports the free room of the store's own disk, and the backup
+scripts refuse (or report) a backup disk that is the same physical disk as the images.
+
 **The worklist feed no longer answers to the published token.** The bridge token had a
 default, `change-me-bridge-token`, published in this repository and accepted by the EMR:
 any EMR never paired with a PACS handed today's imaging patients to anyone who knew that

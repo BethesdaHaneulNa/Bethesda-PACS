@@ -116,6 +116,67 @@ into the EMR.
 
 ---
 
+## Where the images are kept: a drive of their own (Windows)
+
+Images take far more room than everything else: an ultrasound image is about 1.5 MB, an
+X-ray film 10-30 MB. By default they are in `storage\` inside this folder - on the same
+disk as Windows and the EMR. A server with a second **internal** disk should keep them
+there, so that a full image disk does not stop Windows and the EMR.
+
+**First installation.** `start.bat` (setup) asks once, showing the drives and their free
+room: Enter keeps `.\storage`; or type a folder on another drive, for example
+`D:\Bethesda-PACS-images`. Without a keyboard: `.\setup.ps1 -StoragePath D:\Bethesda-PACS-images`.
+The choice is one line of `.env`:
+
+```
+ORTHANC_STORAGE_PATH=D:/Bethesda-PACS-images
+```
+
+**A PACS that already holds images** is moved with one script:
+
+```
+powershell -ExecutionPolicy Bypass -File .\move-image-storage.ps1 -To D:\Bethesda-PACS-images -Check
+powershell -ExecutionPolicy Bypass -File .\move-image-storage.ps1 -To D:\Bethesda-PACS-images
+```
+
+`-Check` only says what would be done. The move itself: asks the image server how much it
+holds; stops it (**devices cannot send meanwhile** - do it outside clinic hours); copies the
+whole store and compares every file's size (the index and a sample of 200 files byte for
+byte; `-FullVerify`: all); writes the new place into `.env`; starts again; asks the image
+server again - studies, images and bytes must be what they were. The old folder is **not
+deleted**: it is renamed `storage.moved-<date>`. Delete it by hand later, once the images
+open in the EMR as usual and the nightly backup has run. If anything fails on the way,
+`.env` is put back and the image server starts on the old place, which was never changed.
+The log is `logs\move-image-storage.log`.
+
+**What not to choose.** A USB disk (it can be unplugged, and goes to sleep - the script
+refuses it without `-AllowUsb`), a network drive (refused), a drive that is not NTFS (the
+free room the EMR sees is wrong: a FAT32 stick with 15.8 GB free was reported as 56 MB).
+
+**When the disk is not there.** The store carries a marker file, `BETHESDA-PACS-STORAGE.id`.
+- The drive letter does not exist: Docker cannot start the containers
+  (`mkdir D:\...: The system cannot find the path specified`).
+- The letter now belongs to another disk, or the folder is gone: Docker Desktop quietly
+  makes an **empty** folder of that name. The image server does **not** run on it - it
+  would look healthy, hold nothing and take in what devices send. The container keeps
+  restarting and `docker logs bethesda-pacs` says *BETHESDA PACS: the image store is not
+  there*. `start.bat` says the same before starting anything.
+- What to do: connect the disk, or give it its letter back (Windows "Disk Management"),
+  then run `start.bat`. Do not copy the marker into an empty folder to make the message
+  go away - that starts an empty image server.
+
+The worklist bridge mounts the store read-only, only to tell the EMR how much room that
+disk has left (the EMR refuses to import a disc's images that would fill it).
+
+**The backup disk must be another physical disk.** `prepare-backup-disk.ps1` refuses a
+disk that is the same physical disk as the image store, and the nightly backup says so in
+its report if it happens anyway.
+
+**Orthanc's storage compression is left off.** It would shrink uncompressed films by
+roughly a third and ultrasound images (already compressed by the device) hardly at all;
+the files in the store would no longer be plain DICOM files, and every read and write
+would cost time. Room is cheaper than that.
+
 ## Connecting an imaging device
 
 Point the device (or its workstation) at this host:
@@ -302,6 +363,14 @@ Run them inside the bridge container, which is on Orthanc's network. `make_demo.
 ---
 
 ## Troubleshooting
+
+**The image server keeps restarting; `docker logs bethesda-pacs` says *the image store is not there*.**
+
+The folder the images are kept in (`ORTHANC_STORAGE_PATH` in `.env`, or `storage\` here) has
+neither its marker file nor an image index: its disk is not connected, or its drive letter
+went to another disk and Docker made an empty folder. Nothing is lost - the image server
+simply refuses to start on an empty folder. Connect the disk or give it its letter back,
+then run `start.bat`. See *Where the images are kept*.
 
 **Setup says the worklist bridge does NOT reach the EMR, or the bridge container is `unhealthy`.**
 
