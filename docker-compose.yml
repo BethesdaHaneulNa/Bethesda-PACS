@@ -6,7 +6,7 @@ services:
     # Pinned on purpose: ":latest" would silently upgrade Orthanc on any pull/restart,
     # which can break a running clinic with nobody around to diagnose it. Bump this
     # number deliberately (and test) when you want a new version.
-    image: orthancteam/orthanc:26.6.1
+    image: orthancteam/orthanc:26.9.1
     container_name: bethesda-pacs
     restart: unless-stopped
     # Before Orthanc's own start-up: is the image store really there? It is recognised by

@@ -2,6 +2,8 @@
 
 ## v1.1.0 — 2026-09-30
 
+- **Orthanc 1.13.0** (image `orthancteam/orthanc:26.9.1`, was 26.6.1 = 1.12.11). Tried first on the isolated stack: the storage folder opens unchanged and can be opened again by 1.12.11; worklist, arrival, import, export, move, backup and restore pass. 1.13.0 refuses a device whose AE title holds a backslash, a tab or a control character. The offline kit needs the new image.
+
 Goes with **[Bethesda EMR v1.5.0](https://github.com/BethesdaHaneulNa/Bethesda-EMR/releases/tag/v1.5.0)**:
 the two change together, and an EMR at 1.5.0 expects this PACS. The EMR's changelog
 (section *Imaging (PACS)*) tells the whole story from the doctor's side; this is the PACS

@@ -23,7 +23,7 @@ contains:
 When you run it, Docker downloads Orthanc automatically. Orthanc remains the property of its
 authors under its own (AGPLv3) license — see **License** below.
 
-The Orthanc image is **pinned to a specific version** (currently `26.6.1`) rather than `:latest`.
+The Orthanc image is **pinned to a specific version** (currently `26.9.1` = Orthanc 1.13.0) rather than `:latest`.
 With `:latest`, a clinic that reboots months from now can silently land on a newer Orthanc whose
 configuration keys or database layout have changed — the PACS stops working, nobody touched
 anything, and there may be no one on site who can diagnose it. Pinning means the version you
