@@ -198,7 +198,8 @@ function Get-ExportBundle {
   finally { Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue }
   $announced = 0; [void][int]::TryParse([string]$r.headers['X-Export-Items'], [ref]$announced)
   if (-not $hasDir -or $count -eq 0 -or ($announced -gt 0 -and $announced -ne $count)) { return @{ ok = $false; code = 'BAD_BUNDLE'; error = "$count / $announced" } }
-  return @{ ok = $true; dir = $disc; items = $count; bytes = $bytes }
+  # (unpacked: the image server was asked to decompress the images - see the EMR's /export/bundle)
+  return @{ ok = $true; dir = $disc; items = $count; bytes = $bytes; unpacked = ([string]$r.headers['X-Export-Unpacked'] -eq '1') }
 }
 
 # ── README.TXT ───────────────────────────────────────────────────────────────

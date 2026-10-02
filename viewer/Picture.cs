@@ -3,9 +3,10 @@
 // MONOCHROME1, rescaled, shown through a window of grey levels; colours as RGB, as
 // luminance and chroma, or through the file's own palette).
 //
-// The pixels are read as they are stored: uncompressed, or JPEG - lossless JPEG by
-// Jpeg.cs, lossy JPEG of 8 bits by Windows. Any other compression is said to be
-// "not shown here" (the disc is made so that it does not occur).
+// The pixels are read as they are stored: uncompressed, RLE (Rle.cs), or JPEG -
+// lossless JPEG by Jpeg.cs, lossy JPEG of 8 bits by Windows. Any other compression is
+// said to be "not shown here" (the disc is made so that it does not occur: the EMR has
+// the image server unpack such images when it makes the bundle).
 //
 // What is shown is the stored picture: it is never turned or flipped.
 using System;
@@ -23,7 +24,7 @@ namespace Bethesda.Viewer {
     public double Slope = 1, Intercept, Center, Width, AspectY = 1;      // the window the picture starts with
     public string Problem = "";                                          // why it cannot be shown ("" = it can): a key of Texts
     public long Low, High;                                               // the range of its values (grey pictures)
-    public string Coding = "raw";                                        // how its pixels are stored: raw, lossless (JPEG, read here), windows (JPEG, read by Windows)
+    public string Coding = "raw";                                        // how its pixels are stored: raw, rle, lossless (JPEG, read here), windows (JPEG, read by Windows)
     public int Steps = 1;                                                // how many of its frames can be shown, one after the other
 
     DataSet d; Element px;
@@ -72,15 +73,19 @@ namespace Bethesda.Viewer {
     // Can it be shown here? "" or the reason; also settles how its pixels are read.
     string Check() {
       if (px.Fragments != null) {
-        if (Array.IndexOf(JpegSyntaxes, TransferSyntax) < 0) return "compressed";
+        bool rle = TransferSyntax == Rle.Syntax;
+        if (!rle && Array.IndexOf(JpegSyntaxes, TransferSyntax) < 0) return "compressed";
         if (px.Fragments.Count < 2) return "unreadable";
         Steps = Splits() ? Frames : 1;
-        // what the JPEG stream says of itself decides who reads it
-        int process, bits, w, h, comps;
-        if (!Jpeg.Header(FrameBytes(0, 65536), out process, out bits, out w, out h, out comps) || w != Cols || h != Rows || comps != Samples) return "unreadable";
-        if (process == 3 && bits <= BitsAllocated) Coding = "lossless";
-        else if (process <= 2 && bits == 8) Coding = "windows";
-        else return "compressed";
+        if (rle) Coding = "rle";
+        else {
+          // what the JPEG stream says of itself decides who reads it
+          int process, bits, w, h, comps;
+          if (!Jpeg.Header(FrameBytes(0, 65536), out process, out bits, out w, out h, out comps) || w != Cols || h != Rows || comps != Samples) return "unreadable";
+          if (process == 3 && bits <= BitsAllocated) Coding = "lossless";
+          else if (process <= 2 && bits == 8) Coding = "windows";
+          else return "compressed";
+        }
       } else if (TransferSyntax != Uncompressed && TransferSyntax != Implicit) return "compressed";
       if (BitsAllocated != 8 && BitsAllocated != 16) return "unsupported";
       if (Samples == 1) {
@@ -178,6 +183,7 @@ namespace Bethesda.Viewer {
       } else {
         ushort[] v;
         if (Coding == "lossless") { int c, b; v = Jpeg.Lossless(FrameBytes(frame, int.MaxValue), out w, out h, out c, out b); if (w != Cols || h != Rows || c != Samples) throw new InvalidDataException("size"); }
+        else if (Coding == "rle") v = Rle.Decode(FrameBytes(frame, int.MaxValue), count, Samples, BitsAllocated / 8);
         else v = Raw(frame);
         if (Samples == 1) Grey(v); else Colour(v);
       }

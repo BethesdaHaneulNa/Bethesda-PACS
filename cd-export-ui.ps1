@@ -23,6 +23,7 @@ $CdxText = @{
     discBlank = 'Graveur {0} — {1} vierge, {2} libres'; fits = '  ✔ tient sur ce disque'; tooBig = '  ✘ {0} de trop : décochez un examen ou utilisez un DVD'
     discUsed = 'Graveur {0} — ce disque n''est pas vierge : il ne sera pas utilisé.'; discOther = 'Graveur {0} — ce disque ne peut pas être gravé ici.'
     stViewer = 'Ajout de la visionneuse…'; noViewer = "`n`n(La visionneuse VOIR.EXE n'a pas pu être ajoutée : {0})"
+    unpacked = "`n`n(Certaines images étaient dans un format que la visionneuse ne lit pas : toutes les images de cette copie ont été décompressées, sans perte. La copie est plus volumineuse.)"
     burn = 'Graver ce CD…'; iso = 'Enregistrer en fichier ISO…'; folder = 'Enregistrer dans un dossier…'
     askBurn = 'Graver {0} examen(s) ({1}) de {2} sur le disque du lecteur {3} ?'
     askFolder = 'Choisissez le dossier (ou la clé USB) où créer la copie'
@@ -73,6 +74,7 @@ $CdxText = @{
     discBlank = '드라이브 {0} — 빈 {1}, {2} 남음'; fits = '  ✔ 이 디스크에 들어갑니다'; tooBig = '  ✘ {0} 넘침: 검사를 줄이거나 DVD를 쓰세요'
     discUsed = '드라이브 {0} — 빈 디스크가 아닙니다. 이 디스크에는 굽지 않습니다.'; discOther = '드라이브 {0} — 이 드라이브로는 구울 수 없는 디스크입니다.'
     stViewer = '뷰어를 넣는 중…'; noViewer = "`n`n(뷰어 VOIR.EXE를 넣지 못했습니다: {0})"
+    unpacked = "`n`n(뷰어가 읽지 못하는 형식의 영상이 있어, 이 사본의 영상을 모두 압축을 풀어 넣었습니다(화질 손실 없음). 사본이 더 큽니다.)"
     burn = '이 CD에 굽기…'; iso = 'ISO 파일로 저장…'; folder = '폴더에 저장…'
     askBurn = '{2} 님의 검사 {0}건({1})을 {3} 드라이브의 디스크에 구울까요?'
     askFolder = '사본을 만들 폴더(또는 USB)를 고르세요'
@@ -123,6 +125,7 @@ $CdxText = @{
     discBlank = 'Burner {0} — blank {1}, {2} free'; fits = '  ✔ fits on this disc'; tooBig = '  ✘ {0} too much: untick an exam or use a DVD'
     discUsed = 'Burner {0} — this disc is not blank: it will not be used.'; discOther = 'Burner {0} — this disc cannot be written here.'
     stViewer = 'Adding the viewer…'; noViewer = "`n`n(The viewer VOIR.EXE could not be added: {0})"
+    unpacked = "`n`n(Some images were in a format the viewer does not read: every image of this copy was decompressed, without loss. The copy is larger.)"
     burn = 'Burn this CD…'; iso = 'Save as ISO file…'; folder = 'Save to a folder…'
     askBurn = 'Burn {0} exam(s) ({1}) of {2} to the disc in drive {3}?'
     askFolder = 'Choose the folder (or USB stick) where the copy is made'
@@ -386,6 +389,7 @@ function Invoke-CdxExport {
       $v = Add-DiscViewer -Dir $b.dir -Sources $script:Cdx.ViewerSource
       if ($v.ok) { $withViewer = $true } else { $viewerNote = (CdxT 'noViewer') -f $v.error }
     }
+    if ($b.unpacked) { $viewerNote += (CdxT 'unpacked') }
     Write-DiscReadme -Dir $b.dir -Patient $p -Clinic $script:Cdx.Patient.clinic -Exams $sel -WithViewer $withViewer
     $fs = $DISC_FILE_SYSTEMS
     $label = Get-DiscLabel ([string]$p.chart_no)

@@ -301,9 +301,12 @@ reference - not for diagnosis". Its source is `viewer\*.cs`; the program builds 
 disc with the C# compiler that ships with Windows - no program file is kept in this repository.
 It shows uncompressed images and JPEG: lossless JPEG - what the clinic's ultrasound machine
 sends (GE LOGIQ P10: lossless, 8-bit RGB) - is decoded by the viewer itself, exactly; lossy
-8-bit JPEG by the decoder that is part of Windows. A file of several frames is stepped through
-with the wheel; there is no playback (no echocardiography at the clinic). RLE, JPEG 2000,
-JPEG-LS and 12-bit lossy JPEG are said to be "not shown here" for now.
+8-bit JPEG by the decoder that is part of Windows. RLE is decoded by the viewer too. A file of
+several frames is stepped through with the wheel; there is no playback (no echocardiography at
+the clinic). What the viewer does not open (JPEG 2000, JPEG-LS, 12-bit lossy JPEG, ...) does not
+reach the disc compressed: when a chosen exam holds such an image, the EMR asks the image server
+to unpack the whole bundle (lossless; the copy is larger - about three times for the clinic's
+ultrasound images if they are in the same copy) and the closing message says so.
 (Weasis on the disc was tried and dropped: 139 MB on every disc, about 95 MB left on the PC
 that runs it.)
 
