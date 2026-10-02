@@ -1,6 +1,7 @@
 ﻿// VOIR.EXE - what is on the disc: the patient, the exams, their series and images, as
-// the DICOMDIR at the top of the disc lists them. Reading that one small file is enough
-// to show the whole list - no image is opened before it is looked at (a CD is slow).
+// the DICOMDIR at the top of the disc lists them. That one small file gives the whole
+// list; then the header of one image of each series is read, for its words - the
+// DICOMDIR the image server writes loses the accents ("Vsicule" for "Vésicule").
 // A folder without a DICOMDIR is listed by opening the files in it.
 using System;
 using System.Collections.Generic;
@@ -26,7 +27,7 @@ namespace Bethesda.Viewer {
       Disc disc = new Disc(); disc.Folder = folder;
       string dir = Path.Combine(folder, "DICOMDIR");
       if (System.IO.File.Exists(dir)) { try { disc.ReadDicomdir(dir); } catch (Exception) { disc.Studies.Clear(); } }
-      if (disc.ImageCount == 0) disc.Scan(folder);
+      if (disc.ImageCount == 0) disc.Scan(folder); else disc.NameByImages();
       disc.Sort();
       return disc;
     }
@@ -76,6 +77,23 @@ namespace Bethesda.Viewer {
       series.Images.Add(new ImageRef { File = file, Number = r.Int(0x00200013, 0), TransferSyntax = r.Str(0x00041512), SopClass = r.Str(0x00041510) });
     }
 
+    // The names as the images themselves give them: the first image of every series.
+    void NameByImages() {
+      bool patient = false;
+      foreach (Study st in Studies) {
+        bool named = false;
+        foreach (Series se in st.Series) {
+          if (se.Images.Count == 0) continue;
+          DataSet d; string ts;
+          try { using (FileStream s = System.IO.File.OpenRead(se.Images[0].File)) d = DicomReader.Open(s, true, out ts); } catch (Exception) { continue; }
+          se.NamedByImage = true;
+          string t = d.Str(0x0008103E); if (t != "") se.Description = t;
+          if (!named) { t = d.Str(0x00081030); if (t != "") st.Description = t; named = true; }
+          if (!patient) { t = d.Name(0x00100010); if (t != "") PatientName = t; patient = true; }
+        }
+      }
+    }
+
     // No DICOMDIR: every DICOM file under the folder, by what its own header says.
     void Scan(string folder) {
       Dictionary<string, Study> studies = new Dictionary<string, Study>(); Dictionary<string, Series> seriesBy = new Dictionary<string, Series>();
@@ -92,7 +110,7 @@ namespace Bethesda.Viewer {
         string su = d.Str(0x0020000D), eu = su + "|" + d.Str(0x0020000E);
         Study study; if (!studies.TryGetValue(su, out study)) { study = NewStudy(d); studies[su] = study; Studies.Add(study); }
         Series series; if (!seriesBy.TryGetValue(eu, out series)) { series = NewSeries(d); seriesBy[eu] = series; study.Series.Add(series); }
-        series.Images.Add(new ImageRef { File = f, Number = d.Int(0x00200013, 0), TransferSyntax = ts, SopClass = d.Str(0x00080016) });
+        series.Images.Add(new ImageRef { File = f, Number = d.Int(0x00200013, 0), TransferSyntax = ts, SopClass = d.Str(0x00080016) }); series.NamedByImage = true;
       }
     }
 

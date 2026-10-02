@@ -129,7 +129,8 @@ namespace Bethesda.Viewer {
       transferSyntax = meta.Str(0x00020010);
       if (transferSyntax == "") throw new InvalidDataException("no transfer syntax");
       if (transferSyntax == "1.2.840.10008.1.2.2" || transferSyntax == "1.2.840.10008.1.2.1.99") throw new InvalidDataException("unsupported transfer syntax");
-      DataSet d = Read(s, s.Length, transferSyntax != "1.2.840.10008.1.2", 8192, headerOnly ? PixelData : 0, latin);
+      // (values are kept up to the size of the largest table of colours a picture may carry)
+      DataSet d = Read(s, s.Length, transferSyntax != "1.2.840.10008.1.2", 131072, headerOnly ? PixelData : 0, latin);
       foreach (KeyValuePair<uint, Element> kv in meta) d[kv.Key] = kv.Value;
       return d;
     }

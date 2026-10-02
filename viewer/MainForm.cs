@@ -15,7 +15,7 @@ namespace Bethesda.Viewer {
     readonly Label where = new Label(), notice = new Label();
     readonly Button prev = new Button(), next = new Button(), fit = new Button(), invert = new Button(), reset = new Button(), help = new Button();
 
-    Series series; int index = -1; Picture picture;
+    Series series; int index = -1, frame; Picture picture;
     double center, width; bool inverted;
 
     // what a test (or a person) can ask
@@ -23,11 +23,12 @@ namespace Bethesda.Viewer {
     public Picture Current { get { return picture; } }
     public Series CurrentSeries { get { return series; } }
     public int CurrentIndex { get { return index; } }
+    public int CurrentFrame { get { return frame; } }
     public double WindowCenter { get { return center; } }
     public double WindowWidth { get { return width; } }
     public bool Inverted { get { return inverted; } }
     public ImagePanel Panel { get { return panel; } }
-    public Bitmap CurrentBitmap { get { return picture == null || picture.Problem != "" ? null : picture.Render(0, center, width, inverted); } }
+    public Bitmap CurrentBitmap { get { return picture == null || picture.Problem != "" ? null : picture.Render(frame, center, width, inverted); } }
 
     public MainForm(Disc d) {
       disc = d;
@@ -63,7 +64,7 @@ namespace Bethesda.Viewer {
 
       panel.Dock = DockStyle.Fill;
       panel.Windowing += delegate(int dx, int dy) { DragWindow(dx, dy); };
-      panel.Step += delegate(int by) { StepImage(by); };
+      panel.Step += delegate(int by) { StepFrame(by); };
       panel.ViewChanged += delegate { Corners(); panel.Invalidate(); };
       Splitter split = new Splitter { Dock = DockStyle.Left, Width = 4 };
       Controls.Add(panel); Controls.Add(split); Controls.Add(tree); Controls.Add(bar); Controls.Add(notice);
@@ -87,14 +88,7 @@ namespace Bethesda.Viewer {
       if (series == null || series.Images.Count == 0) return;
       i = Math.Max(0, Math.Min(series.Images.Count - 1, i));
       if (picture != null) picture.Dispose();
-      index = i; picture = Picture.Open(series.Images[i].File); inverted = false;
-      // The image's own words for its series are better than the disc list's (which loses
-      // accents): taken from the first image opened, once.
-      if (!series.NamedByImage && picture.Problem != "unreadable") {
-        series.NamedByImage = true;
-        if (picture.SeriesDescription != "" && picture.SeriesDescription != series.Description) series.Description = picture.SeriesDescription;
-        foreach (TreeNode sn in tree.Nodes) foreach (TreeNode n in sn.Nodes) if (n.Tag == series) n.Text = series.Label;
-      }
+      index = i; frame = 0; picture = Picture.Open(series.Images[i].File); inverted = false;
       if (picture.Problem == "") {
         Cursor = Cursors.WaitCursor;
         try { picture.DefaultWindow(out center, out width); panel.Message = ""; panel.Show(picture.Render(0, center, width, inverted), picture.AspectY, false); }
@@ -105,6 +99,14 @@ namespace Bethesda.Viewer {
       Corners(); Buttons(); panel.Invalidate();
     }
     public void StepImage(int by) { if (series != null && index + by >= 0 && index + by < series.Images.Count) ShowImage(index + by); }
+    // The wheel: through the frames of a file that holds several, then on to the next image.
+    public void StepFrame(int by) {
+      if (picture == null || picture.Problem != "" || frame + by < 0 || frame + by >= picture.Steps) { StepImage(by); return; }
+      frame += by;
+      try { panel.Show(picture.Render(frame, center, width, inverted), picture.AspectY, true); }
+      catch (Exception) { picture.Problem = "unreadable"; panel.Message = Texts.Get(picture.Problem); panel.Show(null, 1, false); }
+      Corners(); Buttons(); panel.Invalidate();
+    }
     public void StepSeries(int by) {
       List<Series> all = new List<Series>(); foreach (Study st in disc.Studies) all.AddRange(st.Series);
       int i = all.IndexOf(series) + by; if (series != null && i >= 0 && i < all.Count) Select(all[i]);
@@ -125,7 +127,7 @@ namespace Bethesda.Viewer {
       if (picture == null || picture.Problem != "") return;
       inverted = false; picture.DefaultWindow(out center, out width); Redraw(); panel.Fit();
     }
-    void Redraw() { panel.Show(picture.Render(0, center, width, inverted), picture.AspectY, true); Corners(); panel.Invalidate(); }
+    void Redraw() { panel.Show(picture.Render(frame, center, width, inverted), picture.AspectY, true); Corners(); panel.Invalidate(); }
 
     // The four corners of the picture: whose it is, which exam, which image, how it is shown.
     void Corners() {
@@ -141,7 +143,7 @@ namespace Bethesda.Viewer {
         view += Texts.Get("zoom", Math.Round(panel.Zoom * 100));
       }
       panel.BottomRight = view;
-      where.Text = at + (picture.Problem == "" && picture.Frames > 1 ? "   —   " + Texts.Get("frames", picture.Frames) : "");
+      where.Text = at + (picture.Problem != "" || picture.Frames <= 1 ? "" : "   —   " + (picture.Steps > 1 ? Texts.Get("frame", frame + 1, picture.Steps) : Texts.Get("frames", picture.Frames)));
     }
     void Buttons() {
       bool can = picture != null && picture.Problem == "";

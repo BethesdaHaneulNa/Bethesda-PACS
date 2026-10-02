@@ -294,13 +294,16 @@ No JPEG copies.
 
 **A small viewer on every disc: `VOIR.EXE`.** A hospital reads the disc with its own imaging
 software; a patient or a small practice has none. So the disc carries the clinic's own viewer -
-about 40 KB, started by a double-click, nothing installed and nothing left on the PC that runs
+about 50 KB, started by a double-click, nothing installed and nothing left on the PC that runs
 it: the exams and series of the disc on the left, the image on the right, window (left drag),
 zoom (Ctrl + wheel), pan (right drag), invert, previous / next. Always in sight: "for
 reference - not for diagnosis". Its source is `viewer\*.cs`; the program builds it into the
 disc with the C# compiler that ships with Windows - no program file is kept in this repository.
-Stage 1: uncompressed images (X-ray films, uncompressed ultrasound stills). JPEG-compressed
-images and ultrasound clips are said to be "not shown here" for now; they come next.
+It shows uncompressed images and JPEG: lossless JPEG - what the clinic's ultrasound machine
+sends (GE LOGIQ P10: lossless, 8-bit RGB) - is decoded by the viewer itself, exactly; lossy
+8-bit JPEG by the decoder that is part of Windows. A file of several frames is stepped through
+with the wheel; there is no playback (no echocardiography at the clinic). RLE, JPEG 2000,
+JPEG-LS and 12-bit lossy JPEG are said to be "not shown here" for now.
 (Weasis on the disc was tried and dropped: 139 MB on every disc, about 95 MB left on the PC
 that runs it.)
 
