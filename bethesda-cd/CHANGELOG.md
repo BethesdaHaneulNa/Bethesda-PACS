@@ -18,4 +18,10 @@ Bethesda PACS repository, started by `cd-export.bat`).
   the viewer's icon and offers to start the viewer. Nothing starts by itself; on a USB stick
   Windows ignores the file.
 - Built with the C# compiler that ships with Windows; nothing is installed.
-- Not yet: bringing another hospital's disc INTO the EMR (planned).
+- **Bringing in a CD or a USB stick from another hospital**: a second way in the same window
+  ("Importer un CD / une clé USB"). The patient by chart number, the disc's exams listed with
+  whose they say they are, a "same patient?" window (a day of birth or a sex that differs is
+  red and must be confirmed in so many words), then the DICOM files sent to the EMR one by
+  one, as they are - with progress, cancel, and nothing left half-way. Only DICOM files are
+  read; programs and libraries on the disc are neither opened nor run. An account of the
+  registration desk may bring in (and sees only that way).

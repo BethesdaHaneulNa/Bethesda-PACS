@@ -32,6 +32,18 @@ namespace Bethesda.Viewer {
       return disc;
     }
 
+    // The list of the DICOMDIR alone - no image is opened, no folder is walked. Null when there
+    // is no DICOMDIR or it lists nothing. (Bethesda CD's "bring in" reads a disc this way.)
+    public static Disc ListOnly(string folder) {
+      Disc disc = new Disc(); disc.Folder = folder;
+      string dir = Path.Combine(folder, "DICOMDIR");
+      if (!System.IO.File.Exists(dir)) return null;
+      try { disc.ReadDicomdir(dir); } catch (Exception) { return null; }
+      if (disc.ImageCount == 0) return null;
+      disc.Sort();
+      return disc;
+    }
+
     // The directory records are linked by their places in the file: each names the next
     // one of its level and the first one of the level below.
     void ReadDicomdir(string path) {

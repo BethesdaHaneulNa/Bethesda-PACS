@@ -5,12 +5,17 @@ imaging exams to a CD - or to a disc image, or to a folder on a USB stick - for 
 to take to another hospital. Every disc it makes carries a small viewer, **VIEWER.EXE**, so
 that the images can be looked at on a PC that has no imaging software.
 
+It also works the other way: a CD or a USB stick **another hospital gave the patient** is
+read, and its images are sent into the patient's chart in the EMR.
+
 Free, non-profit, made for Bethesda Hospital (Madagascar). French first; Korean and English
 for the people who install and support it.
 
 ```
 Bethesda-CD.exe    sign in with an EMR account -> chart number -> tick the exams ->
                    "Graver ce CD…" / "Enregistrer en fichier ISO…" / "Enregistrer dans un dossier…"
+                   or: "Importer un CD / une clé USB" -> choose the disc -> tick its exams ->
+                   "is this the same patient?" -> the images go into the chart
 
 the disc           DICOMDIR      the standard index            \  made by the clinic's image
                    IMAGES\       the original DICOM files      /  server, handed on untouched
@@ -24,14 +29,18 @@ the disc           DICOMDIR      the standard index            \  made by the cl
 - **Windows 10 (1903 or later) or Windows 11.** Nothing is installed: the program runs on the
   .NET Framework 4.8 that ships with Windows, draws its window with Windows' own toolkit and
   burns with Windows' own burning component (IMAPI2). It changes no system setting.
-- **A Bethesda EMR it can reach over the network** - version **1.5.0 or later**. The program
-  talks to the EMR only, over these calls:
+- **A Bethesda EMR it can reach over the network** - version **1.5.0 or later** to copy out;
+  bringing in needs an EMR that has the import calls (an older one is told apart, and the
+  program says so). The program talks to the EMR only, over these calls:
 
   | call | what for |
   |---|---|
-  | `POST /api/auth/login` | sign in (an account with the Consultation or the Payment permission) |
+  | `POST /api/auth/login` | sign in (Consultation or Payment to copy out; those, or Registration, to bring in) |
   | `GET /api/pacs/export/patient?chart_no=` | the patient and the imaging exams, each with its size or the reason it cannot be copied |
   | `GET /api/pacs/export/bundle?order_item_ids=&medium=` | the chosen exams as one ZIP: `DICOMDIR` + `IMAGES/` |
+  | `GET /api/pacs/import/patient?chart_no=` | bringing in: the patient, the limits (largest file, free room), what was brought in before |
+  | `POST /api/pacs/import/check` | what the EMR knows of the disc's exams: can be brought in, here already, another patient's… |
+  | `POST /api/pacs/import/begin` · `PUT …/{id}/instance` · `POST …/{id}/finish` · `POST …/{id}/cancel` | one exam: announced, sent file by file (each DICOM file as it is), put in the chart - or taken back |
 
   It never talks to the image server (Orthanc) and does not have its password. The EMR checks
   the account, refuses exams that must not leave (cancelled, identity warning, no images) and
@@ -69,6 +78,36 @@ with the last folder used and the language - never a password (see
 - A folder or an ISO saved by the program holds a patient's images, unencrypted: delete it
   when it is no longer needed.
 - `Bethesda-CD.exe -Lang ko` (or `en`) for one run; `lang=ko` in the `.ini` to keep it.
+
+### Bringing in a CD or a USB stick from another hospital
+
+"Importer un CD / une clé USB" at the top of the window. An account of the registration desk
+sees only this way; an account that may also copy out sees both.
+
+1. Type the chart number of the patient who will receive the images.
+2. "Choisir le disque ou le dossier…": the CD, or the folder of the USB stick. The program
+   lists the exams it finds - date, type, name, number of images, size, the hospital, and
+   whose the disc says they are. An exam the EMR already has, or that cannot be taken (a
+   file over the limit…), is grey and says why.
+3. Tick the exams, then "Importer…". A window shows **what the disc says of the patient
+   beside what the chart says**; a day of birth or a sex that differs is red, and the person
+   must tick "all the same, these images are this patient's" to go on. The name is shown,
+   never judged.
+4. The files are sent one by one, with a count; "Annuler" gives the exam up, and the EMR
+   takes back what it had received. At the end the exams are in the EMR (Imagerie → Imagerie
+   externe).
+
+- **Only DICOM files are read**, and only their headers until they are sent. With a
+  `DICOMDIR` on the disc, the files it lists are the only ones touched. Without one the folder
+  is walked, and a program, a library or a document (the other maker's viewer, its DLLs,
+  `AUTORUN.INF`, pictures, notes) is **not opened at all**. Nothing on the disc is ever run.
+- **The files are sent as they are** - the program changes nothing in them and writes nothing
+  to the disc or to this PC. It is the EMR that files them under the patient's own number.
+- The limits come from the EMR (the largest file it takes, the room left on the image
+  server, the size above which it warns). The program asks them; it has none of its own.
+- One patient of the disc at a time: a disc that holds two patients says so.
+- A cut connection is tried again (sending the same file twice is safe); a file the disc no
+  longer gives (a scratch, the stick pulled out) stops the exam, which is taken back.
 
 ## The viewer, VIEWER.EXE
 
@@ -127,15 +166,18 @@ this program (a disc with a cross; drawn for the Bethesda EMR, PACS and CD toget
 sources and how the .ico files are made are in the EMR's wiki). `-IconFile x.ico` builds with
 another; without any icon file one is drawn on the spot by `icon/make-icon.ps1`. The viewer is
 built first and carried inside `Bethesda-CD.exe` as a resource, so every disc gets the very
-same `VIEWER.EXE`. The version is written in one place, `src\shared\Version.cs`.
+same `VIEWER.EXE`; the viewer's reading of a disc (`src\viewer\Dicom.cs`, `Disc.cs`) is also
+compiled into the program, which reads another hospital's disc with it. The version is written in one place, `src\shared\Version.cs`.
 
 ```
-src\app\        the program:  Program · MainForm · Texts · Emr · DiscFolder · Burner
+src\app\        the program:  Program · MainForm · Texts · Emr · DiscFolder · Burner · ImportDisc · ImportConfirm
 src\viewer\     the viewer:   Program · MainForm · ImagePanel · Disc · Dicom · Picture · Jpeg · Rle · Texts
 src\shared\     Version.cs
 icon\           make-icon.ps1
 install.ps1     install.bat - the program and a desktop shortcut on a PC
-tests\          viewer_test.ps1 · disc_test.ps1 · app_test.ps1
+tests\          viewer_test.ps1 · disc_test.ps1 · import_test.ps1 · app_test.ps1 · import_real_test.ps1
+                (fake_dicom.ps1: the made-up DICOM files the two import tests write;
+                 quiet_window.ps1: the tests' windows are shown off the screen)
 ```
 
 The program is not signed. Built on the PC that runs it, or brought on a USB stick, Windows
@@ -147,7 +189,9 @@ internet" mark and SmartScreen asks once ("More info" -> "Run anyway").
 ```powershell
 .\tests\viewer_test.ps1      # needs nothing: draws its own pictures, encodes them, checks the viewer
 .\tests\disc_test.ps1 -Mount  # needs nothing: the viewer, AUTORUN.INF and README.TXT on a disc folder, a folder copy, a disc image
+.\tests\import_test.ps1       # needs nothing: a made-up disc and a stand-in for the EMR on this PC - bringing in, start to end
 .\tests\app_test.ps1 -Emr http://127.0.0.1:9188 -Login someone -Chart 26-00001 -ExamIds 55,56 -Base D:\empty\folder
+.\tests\import_real_test.ps1 -Emr http://127.0.0.1:9188 -Login someone -Chart 26-00001
 ```
 
 `viewer_test.ps1` writes made-up pictures as DICOM in every form the viewer reads (RLE and
@@ -156,10 +200,27 @@ checks that every value comes back as it went in; then it drives the viewer's wi
 `disc_test.ps1` puts the viewer, `AUTORUN.INF` and `README.TXT` into a disc folder without
 the EMR, saves it to a folder and to a disc image and - with `-Mount` - puts the image in a
 Windows virtual drive, reads every file back and takes it out again.
+`import_test.ps1` writes a made-up "other hospital's disc" (DICOM files, and a viewer, a
+library and other files that must not be opened), starts a stand-in for the EMR on
+127.0.0.1 that answers the import calls as the EMR's document says, and drives the window:
+who may do what, the list, the patient question, the files sent byte for byte, a refusal, a
+cut connection, a cancel, the limits, a disc of two patients, a file that can no longer be
+read. What the real EMR does with the files is not its business - that is checked against a
+test EMR.
 `app_test.ps1` drives the built program against a **test** installation of the EMR (never the
 one the clinic works on): sign-in, the list, a copy to a folder, a disc image, the refusals.
 It burns nothing. The test account's password is taken from the environment variable
 `BETHESDA_CD_TEST_PASSWORD`.
+`import_real_test.ps1` brings a made-up exam of three small images into a chart of a **test**
+EMR that has its image server (same password variable): the exam really goes in and the EMR
+lists it, the same exam is refused a second time, a second exam is stopped half-way and the
+EMR is seen to have taken it back. It leaves that one made-up exam in the test EMR and says
+which; on the PC it leaves nothing. `-RealDisc D:\a\disc` also brings in the exams of a disc
+folder the test did not make (they stay in the test EMR too); `-OverLimit` sends one file
+larger than the EMR allows, to see the refusal.
+
+The tests that drive a window show it far off the screen, out of the taskbar and without
+taking the keyboard: someone may be working at the PC.
 
 ## License
 

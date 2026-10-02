@@ -22,6 +22,7 @@ if (-not $pw) { throw 'Set BETHESDA_CD_TEST_PASSWORD to the test account''s pass
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 $Exe = (Resolve-Path -LiteralPath $Exe).Path
 [void][Reflection.Assembly]::LoadFrom($Exe)
+. (Join-Path $PSScriptRoot 'quiet_window.ps1')
 $script:res = @(); $script:said = New-Object Collections.Generic.List[string]; $script:answer = $true; $script:folder = $Base; $script:isoPath = ''; $script:isoName = ''
 function Check([string]$label, $good, [string]$extra = '') { $script:res += [bool]$good; '{0} {1} {2}' -f $(if ($good) { 'PASS' } else { 'FAIL' }), $label, $extra }
 # the person at the window, played by the test
@@ -32,7 +33,7 @@ function Check([string]$label, $good, [string]$extra = '') { $script:res += [boo
 [Bethesda.Cd.Texts]::Lang = $Lang
 $ini = Join-Path $env:TEMP ('bethesda-cd-test-' + [Guid]::NewGuid().ToString('N') + '.ini')
 [void][Bethesda.Cd.DiscFolder]::RemoveTemp('')
-$form = New-Object Bethesda.Cd.MainForm([Bethesda.Cd.Config]::Read($ini)); $form.Show(); [Windows.Forms.Application]::DoEvents()
+$form = New-Object Bethesda.Cd.MainForm([Bethesda.Cd.Config]::Read($ini)); Show-Quietly $form
 function Shot([string]$name) {
   if (-not $Shots) { return }
   [Windows.Forms.Application]::DoEvents()
