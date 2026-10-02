@@ -282,20 +282,35 @@ What is written is a standard DICOM disc - `DICOMDIR` and the original files und
   account's rights, refuses exams that must not leave (cancelled, or carrying an identity
   warning) and writes **one line in its change log per copy** - no line, no copy.
 - Only a **blank** disc is written. A disc that already holds something is never used and
-  never erased. The disc is closed: nothing can be added to it later.
+  never erased. The disc is closed: nothing can be added to it later. It is written at the
+  slowest speed the drive offers and checked twice - by the drive, then file by file. A small
+  exam takes about three minutes, most of it the check.
 - Nothing is installed and no system setting is changed: burning is Windows' own (IMAPI2).
   The images fetched stay under `%TEMP%\BethesdaCD` while the copy is made and are removed
   afterwards (and at the next start, if the program was killed).
 - A folder or an ISO saved by the program holds a patient's images, unencrypted: delete it
   when it is no longer needed.
 
-**A viewer on the disc (optional, not yet tried with a real viewer).** If a folder `cd-viewer`
-holding `Weasis.exe` (a copy of an installed [Weasis](https://weasis.org), EPL-2.0 OR Apache-2.0,
-used unmodified) is beside the program, the window offers a tick box: the folder is then copied
-onto the disc as `VIEWER\` and `VOIR.BAT` at the top starts it on the disc's own images - the
-same way Weasis puts its viewer on the discs it writes. No autorun file is written. Without that
-folder the box is not shown and nothing changes. `cd-viewer/` is git-ignored: the viewer is not
-part of this repository.
+**A viewer on the disc (optional).** A hospital reads the disc with its own imaging software;
+a patient or a small practice has none. If a folder `cd-viewer` holding `Weasis.exe` is beside
+the program, the window offers a tick box: the folder is copied onto the disc as `VIEWER\` and
+`VOIR.BAT` at the top starts it on the disc's own images (it reads the `DICOMDIR` by itself) -
+the same way [Weasis](https://weasis.org) puts its viewer on the discs it writes. No autorun
+file is written. Without that folder the box is not shown and nothing changes.
+
+To make `cd-viewer` without installing anything: download `Weasis-<version>-x86-64.msi` from
+Weasis's official releases, unpack it with
+`msiexec /a Weasis-<version>-x86-64.msi /qn TARGETDIR=<an empty folder>` (an administrative
+extraction: nothing is registered on the PC), and copy the folder `PFiles64\Weasis` it produced
+beside the program under the name `cd-viewer`. Tried with Weasis 4.7.3: about 140 MB on the
+disc, 64-bit Windows only; it starts from a USB folder and from a read-only disc image. The
+first start shows Weasis's own notice (not a certified medical device) to accept. On the PC that
+runs it, about 95 MB stay in the user's `.weasis` folder (no patient name), and the temporary
+copies of the images are removed when its window is closed.
+
+Weasis is free software (EPL-2.0 OR Apache-2.0), used unmodified; it is **not** part of this
+repository (`cd-viewer/` is git-ignored). The unpacked folder carries the Java runtime's
+licence texts (`runtime\legal`) but not Weasis's own: add its `LICENSE` file to `cd-viewer`.
 
 Files: `cd-export.bat` (start), `cd-export.ps1`, `cd-export-ui.ps1` (the window),
 `cd-export-common.ps1` (the work). Needs an EMR that has `GET /api/pacs/export/patient`

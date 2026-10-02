@@ -332,7 +332,11 @@ function Wait-CdxJob($Job, [string]$Key) {
     else {
       $pct = [int](100 * $Job.DoneBytes / $Job.TotalBytes)
       $el = (Get-Date) - $t0
-      Set-CdxStatus ((CdxT $Key) -f $pct, ('{0:00}:{1:00}' -f [int][Math]::Floor($el.TotalMinutes), $el.Seconds)) $pct
+      $clock = '{0:00}:{1:00}' -f [int][Math]::Floor($el.TotalMinutes), $el.Seconds
+      # The whole image has been handed over: the burner is closing the disc and reading it
+      # back - that takes a while and has no figure of its own.
+      if ($pct -ge 100) { Set-CdxStatus ((CdxT 'stCheck') + '   ' + $clock) -1 }
+      else { Set-CdxStatus ((CdxT $Key) -f $pct, $clock) $pct }
     }
     Start-Sleep -Milliseconds 150
   }

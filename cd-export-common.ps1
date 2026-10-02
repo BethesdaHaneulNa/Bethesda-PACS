@@ -418,6 +418,7 @@ namespace Bethesda {
     private int state; private long total; private CountingStream counter; private long written;
     private object fsiRef, resultRef, streamRef, recorderRef, formatRef;
     public string Error = ""; public string Step = ""; public bool CheckedByBurner = false; public int HResult = 0;
+    public int WriteSpeed = 0;                                                    // sectors a second asked of the drive (0 = its own choice)
     public int State { get { return Thread.VolatileRead(ref state); } }          // 0 not started, 1 working, 2 done, 3 failed
     public long TotalBytes { get { return Interlocked.Read(ref total); } }
     public long DoneBytes { get { CountingStream c = counter; return c != null ? c.BytesRead : Interlocked.Read(ref written); } }
@@ -492,6 +493,13 @@ namespace Bethesda {
         IStream s = Build(dir, volume, fileSystems, (object)rec);
         fmt.ForceMediaToBeClosed = true;                 // a finished disc: nothing can be added later
         try { ((IBurnVerification)(object)fmt).put_BurnVerificationLevel(2); CheckedByBurner = true; } catch (Exception) { CheckedByBurner = false; }
+        // The slowest speed the drive offers for this disc: a few minutes more at most, and
+        // kinder to cheap discs and to slim drives fed by a USB port.
+        try {
+          int slowest = int.MaxValue;
+          foreach (object v in (System.Collections.IEnumerable)fmt.SupportedWriteSpeeds) { int sp = Convert.ToInt32(v); if (sp > 0 && sp < slowest) slowest = sp; }
+          if (slowest != int.MaxValue) { fmt.SetWriteSpeed(slowest, false); WriteSpeed = slowest; }
+        } catch (Exception) { }
         counter = new CountingStream(s);
         Step = "write";
         fmt.Write(new UnknownWrapper(counter));
@@ -526,11 +534,19 @@ function Get-Burners {
         $fmt.Recorder = $rec; $fmt.ClientName = 'BethesdaCdExport'
         try {
           $type = [int]$fmt.CurrentPhysicalMediaType
-          $b.media = $MEDIA_NAMES[$type]; if (-not $b.media) { $b.media = 'disc' }
-          $b.rewritable = $MEDIA_REWRITABLE -contains $type
-          if (-not $fmt.IsCurrentMediaSupported($rec)) { $b.state = 'other' }
-          elseif ($fmt.MediaHeuristicallyBlank) { $b.state = 'blank'; $b.freeBytes = [long]$fmt.FreeSectorsOnMedia * $SECTOR }
-          else { $b.state = 'used' }
+          if ($type -le 0) { $b.state = 'none' }         # no disc, or the tray is open: the drive names no kind of disc
+          else {
+            $b.media = $MEDIA_NAMES[$type]; if (-not $b.media) { $b.media = 'disc' }
+            $b.rewritable = $MEDIA_REWRITABLE -contains $type
+            if (-not $fmt.IsCurrentMediaSupported($rec)) {
+              # Nothing more can be written to it: a pressed disc, or a recordable one that was
+              # closed - a CD-R this program burnt comes back named "CD-ROM" by the drive.
+              # Either way it is "not blank" to the person at the window.
+              $b.state = 'used'
+            }
+            elseif ($fmt.MediaHeuristicallyBlank) { $b.state = 'blank'; $b.freeBytes = [long]$fmt.FreeSectorsOnMedia * $SECTOR }
+            else { $b.state = 'used' }
+          }
         } catch { $b.state = 'none' }                    # no disc: the questions about it fail
       }
     } catch { }
