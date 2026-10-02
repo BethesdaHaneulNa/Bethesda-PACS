@@ -99,8 +99,10 @@ server unpack that copy, losslessly, and the program says so. There is no playba
 ```
 
 Only what Windows already has is used: the C# compiler of the .NET Framework (`csc.exe`, C# 5).
-Nothing is installed or downloaded. The icon is `icon\Bethesda-CD.ico` when that file is there (or
-`-IconFile x.ico`); without one it is drawn on the spot by `icon\make-icon.ps1`. The viewer is
+Nothing is installed or downloaded. The icon is `icon/Bethesda-CD.ico` - the project's own mark for
+this program (a disc with a cross; drawn for the Bethesda EMR, PACS and CD together - the SVG
+sources and how the .ico files are made are in the EMR's wiki). `-IconFile x.ico` builds with
+another; without any icon file one is drawn on the spot by `icon/make-icon.ps1`. The viewer is
 built first and carried inside `Bethesda-CD.exe` as a resource, so every disc gets the very
 same `VOIR.EXE`. The version is written in one place, `src\shared\Version.cs`.
 
