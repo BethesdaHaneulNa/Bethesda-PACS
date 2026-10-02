@@ -286,6 +286,30 @@ try {
   $r = $form.Import()
   Check '  said, the exam is taken back, nothing in the chart' (-not $r.Ok -and $r.Imported -eq 0 -and (Calls '*cancel') -eq 1 -and (Calls '*finish') -eq 0 -and $script:said[0] -match '^\[error\]') $script:said[0]
 
+  '13b. a Korean disc: the name of the patient'
+  # the same made-up person on four exams, written as devices write: Korean bytes with no set named, with
+  # "Western Europe" named, with the Korean set named and its switches inside the name, and in UTF-8
+  $kr = [Text.Encoding]::GetEncoding(949); $latin = [Text.Encoding]::GetEncoding(28591)
+  $given = "$([char]0xAE38)$([char]0xB3D9)"; $hong = "$([char]0xD64D)^$given"; $local = "$([char]0xD64D) $given"
+  $esc = [byte[]](0x1B, 0x24, 0x29, 0x43)
+  $names = Join-Path $work 'korean'; $K = '1.2.826.0.1.3680043.8.498.7300'
+  function Korean([int]$n, [byte[]]$bytes, [string]$set) {
+    [FakeDicom]::NameBytes = $bytes; [FakeDicom]::Charset = $set
+    [FakeDicom]::Write((Join-Path $names "K$n\IM1"), "$K.$n", "$K.$n.1", "$K.$n.1.1", "K-$n", 'x', '19850412', 'F', 'HOPITAL', "2024082$n", 'upper abdomenUS', 'US', '', 9000)
+    [FakeDicom]::NameBytes = $null; [FakeDicom]::Charset = $null
+  }
+  Korean 1 ($kr.GetBytes($hong)) ''
+  Korean 2 ($kr.GetBytes($hong)) 'ISO_IR 100'
+  Korean 3 ([byte[]]($latin.GetBytes('Hong^Gildong=') + $latin.GetBytes('=') + $esc + $kr.GetBytes([string][char]0xD64D) + $latin.GetBytes('^') + $esc + $kr.GetBytes($given))) '\ISO 2022 IR 149'
+  Korean 4 ((New-Object Text.UTF8Encoding($false)).GetBytes($hong)) 'ISO_IR 192'
+  $S.done.Clear(); $S.states.Clear(); Reset; [void]$form.Search(); $ok = $form.LoadSource($names)
+  $by = @{}; foreach ($st in $form.Source.Studies) { $by[$st.PatientId] = $st }
+  Check '  read whatever the file says of its character set: no set, "Western Europe", UTF-8' ($ok -and $form.Source.Studies.Count -eq 4 -and $by['K-1'].PatientName -eq $hong -and $by['K-2'].PatientName -eq $hong -and $by['K-4'].PatientName -eq $hong -and $by['K-1'].PatientShown -eq $local) "$($by['K-1'].PatientShown) | $($by['K-2'].PatientShown) | $($by['K-4'].PatientShown)"
+  Check '  a name in Latin letters and in Hangul, with the switches inside it: both shown, no stray signs' ($by['K-3'].PatientName -eq "Hong^Gildong==$hong" -and $by['K-3'].PatientShown -eq "Hong Gildong ($local)") $by['K-3'].PatientShown
+  Check '  the list shows it' ([string](Row "$K.1").Cells[7].Value -eq $local -and [string](Row "$K.3").Cells[7].Value -eq "Hong Gildong ($local)") ([string](Row "$K.1").Cells[7].Value)
+  Tick "$K.1"; $r = $form.Import(); $bg = Body '/api/pacs/import/begin'
+  Check '  the question names the person as written; the EMR is told the name in the same letters' ($r.Ok -and $script:asked.DiscName -eq $local -and $bg.source.patient_name -eq $hong) "$($script:asked.DiscName) | $($bg.source.patient_name)"
+
   '14. an EMR that cannot bring in yet, a session that has ended'
   $S.noImport = $true; Reset; $ok = $form.Search()
   Check '  an older EMR: the window says it cannot bring in' (-not $ok -and $form.PatientLine.Text.Length -gt 10 -and -not $form.ImportButton.Enabled) $form.PatientLine.Text
