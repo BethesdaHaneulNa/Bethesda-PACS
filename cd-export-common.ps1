@@ -226,11 +226,8 @@ function Write-DiscReadme {
   $L.Add('  IMAGES    les images d''origine')
   $L.Add('Pour les voir : ouvrez ce disque avec votre logiciel d''imagerie (PACS ou')
   $L.Add('visionneuse DICOM), fonction « importer un CD / ouvrir un DICOMDIR ».')
-  if ($WithViewer) {
-    $L.Add('Sans logiciel d''imagerie : double-cliquez sur VOIR.BAT (Windows 64 bits).')
-    $L.Add('Le démarrage depuis un disque est lent. La visionneuse fournie (Weasis,')
-    $L.Add('dossier VIEWER) n''est pas un dispositif médical certifié.')
-  }
+  # (-WithViewer: the lines that tell how to start the viewer on the disc come back here
+  #  when the clinic's own viewer exists.)
   $L.Add('Ce disque contient des données médicales personnelles : remettez-le au patient')
   $L.Add('ou au médecin destinataire uniquement.')
   $L.Add('')
@@ -249,26 +246,22 @@ function Write-DiscReadme {
   $L.Add('  IMAGES    the original images')
   $L.Add('To see them: open this disc with your imaging software (PACS or DICOM')
   $L.Add('viewer), "import a CD / open a DICOMDIR".')
-  if ($WithViewer) {
-    $L.Add('Without imaging software: double-click VOIR.BAT (64-bit Windows). Starting')
-    $L.Add('from a disc is slow. The viewer provided (Weasis, folder VIEWER) is not a')
-    $L.Add('certified medical device.')
-  }
   $L.Add('This disc holds personal medical data: hand it to the patient or to the')
   $L.Add('receiving doctor only.')
   [IO.File]::WriteAllText((Join-Path $Dir 'README.TXT'), (($L -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding($true)))
 }
 
-# ── the viewer (optional) ────────────────────────────────────────────────────
-# A hospital reads the disc with its own imaging software. For whoever has none, the
-# Weasis viewer can be put on the disc: the folder cd-viewer beside this program - a copy
-# of an installed Weasis (how to make it: README) - goes onto the disc as VIEWER\, as it
-# is, with VOIR.BAT at the top to start it. That is how Weasis itself puts its viewer on
-# the discs it writes (its "Add Weasis" option): it is started with the option that makes
-# it open the DICOMDIR beside it. Weasis is not changed. No autorun file is written.
-$VIEWER_EXE = 'Weasis.exe'
+# ── the viewer (a place kept for it) ─────────────────────────────────────────
+# A hospital reads the disc with its own imaging software; a patient has none. A viewer
+# on the disc was tried with Weasis and dropped (director, 2026-10-02: 139 MB on every
+# disc, about 95 MB left on the PC that runs it, an English notice to accept) - the clinic
+# will have a small viewer of its own (EMR wiki, reference/cd-mini-viewer-design.md).
+# Until it exists nothing is offered: $VIEWER_START names the program in the folder
+# cd-viewer that would start it, and it is empty. What is kept is the way in: a folder
+# beside the program copied onto the disc as VIEWER\, counted in the room needed.
+$VIEWER_START = ''
 function Get-ViewerInfo([string]$ViewerDir) {
-  if (-not $ViewerDir -or -not (Test-Path -LiteralPath (Join-Path $ViewerDir $VIEWER_EXE) -PathType Leaf)) { return $null }
+  if (-not $VIEWER_START -or -not $ViewerDir -or -not (Test-Path -LiteralPath (Join-Path $ViewerDir $VIEWER_START) -PathType Leaf)) { return $null }
   $n = 0; $b = [long]0
   foreach ($f in [IO.Directory]::GetFiles($ViewerDir, '*', [IO.SearchOption]::AllDirectories)) { $n++; $b += (New-Object IO.FileInfo($f)).Length }
   return @{ dir = (Resolve-Path -LiteralPath $ViewerDir).Path; files = $n; bytes = $b }
@@ -286,16 +279,6 @@ function Add-DiscViewer {
     [IO.File]::Copy($f, $dest, $true)
     $n++; if ($OnFile -and ($n % 20 -eq 0 -or $n -eq $files.Count)) { & $OnFile $n $files.Count }
   }
-  # The line Weasis writes in its own RUN.BAT, with the folder's name: "open what is on the
-  # disc this file is on". %% is a percent sign inside a .bat file.
-  $bat = @(
-    '@echo off',
-    'REM Ouvre les images de ce disque avec la visionneuse du dossier VIEWER (Windows 64 bits).',
-    'REM Opens the images of this disc with the viewer in the VIEWER folder (64-bit Windows).',
-    'cd /d "%~dp0"',
-    'start "" "VIEWER\Weasis.exe" "weasis://%%24dicom%%3Aget%%20-p%%20%%24weasis%%3Aconfig%%20pro%%3D%%22weasis.portable.dir%%20.%%22"'
-  )
-  [IO.File]::WriteAllText((Join-Path $Dir 'VOIR.BAT'), (($bat -join "`r`n") + "`r`n"), [Text.Encoding]::ASCII)
   return $n
 }
 # The file systems of a disc image: ISO 9660 + Joliet for the DICOM files (what imaging

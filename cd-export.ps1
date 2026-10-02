@@ -23,7 +23,7 @@
 param(
   [ValidateSet('fr', 'ko', 'en')][string]$Lang = 'fr',
   [string]$ConfigPath = (Join-Path $PSScriptRoot 'cd-export.ini'),
-  [string]$ViewerDir = (Join-Path $PSScriptRoot 'cd-viewer')   # a copy of an installed Weasis, if the clinic wants the viewer on its discs
+  [string]$ViewerDir = (Join-Path $PSScriptRoot 'cd-viewer')   # kept for the clinic's own viewer; nothing is offered until it exists
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'cd-export-common.ps1')
