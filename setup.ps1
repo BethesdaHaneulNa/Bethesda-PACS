@@ -126,8 +126,8 @@ Write-Host ""
 Write-Host "After restoring an EMR backup, run .\pair-with-emr.ps1 again - the backup"
 Write-Host "brings the old machine's bridge token with it."
 
-# Shortcuts on this PC's desktop: the image server's page and the CD program. Only files
-# on the desktop - a failure here does not undo the installation.
+# Shortcuts on this PC's desktop: the image server's administration page and the CD
+# program. Only files on the desktop - a failure here does not undo the installation.
 try {
   Write-Host ""
   & (Join-Path $PSScriptRoot 'desktop-shortcuts.ps1') | ForEach-Object { Write-Host $_ }
