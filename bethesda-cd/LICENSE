@@ -5,7 +5,7 @@ Made for Bethesda Hospital, Madagascar, with the support of the church
 "행복한 섬김의 열매 / Fruit of Joyful Devotion".
 
 This license covers the code in this folder: the program Bethesda-CD.exe, the
-viewer VOIR.EXE, their build and test scripts and the docs. They use only what
+viewer VIEWER.EXE, their build and test scripts and the docs. They use only what
 ships with Windows; no other program is included or distributed with them.
 
 For this code — non-profit, source-available:

@@ -1,4 +1,4 @@
-﻿# Bethesda CD - the viewer (VOIR.EXE) checked without a person and without any outside
+﻿# Bethesda CD - the viewer (VIEWER.EXE) checked without a person and without any outside
 # file: this script DRAWS its own pictures, writes them as DICOM files in every form the
 # viewer reads - uncompressed, RLE, lossless JPEG with each of the seven predictors, with
 # and without restart intervals - and checks that the viewer gives back exactly the

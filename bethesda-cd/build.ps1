@@ -1,17 +1,17 @@
 # Bethesda CD - build. Uses only what Windows has: the C# compiler of the .NET Framework
 # (csc.exe, C# 5). Nothing is installed, nothing is downloaded.
 #
-#   .\build.ps1                  -> build\Bethesda-CD.exe   (the viewer VOIR.EXE is inside it)
+#   .\build.ps1                  -> build\Bethesda-CD.exe   (the viewer VIEWER.EXE is inside it)
 #   .\build.ps1 -IconFile x.ico  with a given icon file
 #
 # The icon: -IconFile when given; else icon\Bethesda-CD.ico when that file is there (the
 # chosen one, once it exists); else one drawn on the spot by icon\make-icon.ps1 (-Icon A, B, C).
 #
 # Two programs are built:
-#   VOIR.EXE          the small viewer that goes on every disc  (src\viewer + src\shared)
+#   VIEWER.EXE        the small viewer that goes on every disc  (src\viewer + src\shared)
 #   Bethesda-CD.exe   the program the clinic runs               (src\app + src\shared),
-#                     carrying VOIR.EXE inside itself as a resource - so every disc it
-#                     makes gets the very same viewer file.
+#                     carrying VIEWER.EXE inside itself as a resource - so every disc
+#                     it makes gets the very same viewer file.
 param([string]$Out = (Join-Path $PSScriptRoot 'build'), [ValidateSet('A', 'B', 'C')][string]$Icon = 'A', [string]$IconFile = '')
 $ErrorActionPreference = 'Stop'
 $csc = Join-Path ([Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) 'csc.exe'
@@ -32,14 +32,14 @@ if ($IconFile) {
   Copy-Item -LiteralPath $IconFile -Destination $ico -Force
 } else { & (Join-Path $PSScriptRoot 'icon\make-icon.ps1') -Variant $Icon -Out $ico | Out-Null }
 
-$voir = Join-Path $Out 'VOIR.EXE'
-Compile 'The viewer' (@('/target:winexe', "/out:$voir", "/win32icon:$ico", '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll') + (Sources 'shared', 'viewer'))
+$viewer = Join-Path $Out 'VIEWER.EXE'
+Compile 'The viewer' (@('/target:winexe', "/out:$viewer", "/win32icon:$ico", '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll') + (Sources 'shared', 'viewer'))
 
 $exe = Join-Path $Out 'Bethesda-CD.exe'
-Compile 'Bethesda CD' (@('/target:winexe', "/out:$exe", "/win32icon:$ico", "/resource:$voir,VOIR.EXE",
+Compile 'Bethesda CD' (@('/target:winexe', "/out:$exe", "/win32icon:$ico", "/resource:$viewer,VIEWER.EXE",
     '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.IO.Compression.dll', '/r:System.IO.Compression.FileSystem.dll',
     '/r:System.Web.Extensions.dll', '/r:Microsoft.CSharp.dll') + (Sources 'shared', 'app'))
 
 $v = [Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
 "built: $exe"
-"  $($v.ProductName) $($v.ProductVersion) - $((Get-Item $exe).Length) bytes, the viewer inside it $((Get-Item $voir).Length) bytes"
+"  $($v.ProductName) $($v.ProductVersion) - $((Get-Item $exe).Length) bytes, the viewer inside it $((Get-Item $viewer).Length) bytes"

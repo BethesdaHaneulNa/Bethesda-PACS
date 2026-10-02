@@ -1,4 +1,4 @@
-﻿// VOIR.EXE - RLE, the simple lossless compression some machines use (DICOM PS3.5
+﻿// VIEWER.EXE - RLE, the simple lossless compression some machines use (DICOM PS3.5
 // annex G). A frame is cut into "segments" - one for each byte of each sample, the
 // high byte first - and each segment is run-length coded (PackBits): a count byte, then
 // either that many bytes as they are, or one byte to repeat.

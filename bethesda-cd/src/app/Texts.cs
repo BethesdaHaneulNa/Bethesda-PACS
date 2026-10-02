@@ -49,7 +49,7 @@ namespace Bethesda.Cd {
       { "tooBig",     new[] { "  ✘ {0} de trop : décochez un examen ou utilisez un DVD", "  ✘ {0} 넘침: 검사를 줄이거나 DVD를 쓰세요", "  ✘ {0} too much: untick an exam or use a DVD" } },
       { "discUsed",   new[] { "Graveur {0} — ce disque n'est pas vierge : il ne sera pas utilisé.", "드라이브 {0} — 빈 디스크가 아닙니다. 이 디스크에는 굽지 않습니다.", "Burner {0} — this disc is not blank: it will not be used." } },
       { "stViewer",   new[] { "Ajout de la visionneuse…", "뷰어를 넣는 중…", "Adding the viewer…" } },
-      { "noViewer",   new[] { "\n\n(La visionneuse VOIR.EXE n'a pas pu être ajoutée : {0})", "\n\n(뷰어 VOIR.EXE를 넣지 못했습니다: {0})", "\n\n(The viewer VOIR.EXE could not be added: {0})" } },
+      { "noViewer",   new[] { "\n\n(La visionneuse VIEWER.EXE n'a pas pu être ajoutée : {0})", "\n\n(뷰어 VIEWER.EXE를 넣지 못했습니다: {0})", "\n\n(The viewer VIEWER.EXE could not be added: {0})" } },
       { "unpacked",   new[] { "\n\n(Certaines images étaient dans un format que la visionneuse ne lit pas : toutes les images de cette copie ont été décompressées, sans perte. La copie est plus volumineuse.)",
                               "\n\n(뷰어가 읽지 못하는 형식의 영상이 있어, 이 사본의 영상을 모두 압축을 풀어 넣었습니다(화질 손실 없음). 사본이 더 큽니다.)",
                               "\n\n(Some images were in a format the viewer does not read: every image of this copy was decompressed, without loss. The copy is larger.)" } },

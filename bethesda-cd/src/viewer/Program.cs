@@ -1,4 +1,4 @@
-﻿// VOIR.EXE - started by a double-click on the disc: it shows the images of the disc it
+﻿// VIEWER.EXE - started by a double-click on the disc: it shows the images of the disc it
 // is on. Given a folder as its argument, it shows that folder instead. When there is
 // nothing to show where it stands, it asks for the folder.
 using System;
@@ -6,7 +6,7 @@ using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
 
-[assembly: AssemblyTitle("VOIR - Bethesda CD viewer")]
+[assembly: AssemblyTitle("VIEWER - Bethesda CD viewer")]
 [assembly: AssemblyDescription("Shows the images of the disc it is on. For reference - not for diagnosis.")]
 
 namespace Bethesda.Viewer {

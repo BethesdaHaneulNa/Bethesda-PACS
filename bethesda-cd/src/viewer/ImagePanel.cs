@@ -1,4 +1,4 @@
-﻿// VOIR.EXE - the part of the window the picture is drawn in: fitted or zoomed, moved
+﻿// VIEWER.EXE - the part of the window the picture is drawn in: fitted or zoomed, moved
 // with the mouse, with a line of text in each corner. It knows nothing about DICOM; the
 // window tells it what to draw and is told what the mouse asks for.
 using System;

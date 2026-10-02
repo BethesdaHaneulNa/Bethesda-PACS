@@ -1,4 +1,4 @@
-﻿// VOIR.EXE - JPEG, the compression ultrasound machines send their pictures in.
+﻿// VIEWER.EXE - JPEG, the compression ultrasound machines send their pictures in.
 //
 // Lossless JPEG (the hospital's own machine: "JPEG Lossless, first-order prediction")
 // is read here, by the standard's own rule (ITU T.81 annex H): every sample is its

@@ -1,4 +1,4 @@
-﻿// VOIR.EXE - the small viewer that goes on every disc cd-export makes.
+﻿// VIEWER.EXE - the small viewer that goes on every disc cd-export makes.
 // This file: reading a DICOM file. Only what a viewer needs - the header, the few dozen
 // attributes that say how to draw the picture, where the pixels are, and the list of a
 // DICOMDIR. Little-endian files, explicit or implicit VR; anything else is refused with

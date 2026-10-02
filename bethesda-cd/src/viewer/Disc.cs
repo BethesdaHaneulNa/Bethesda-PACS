@@ -1,4 +1,4 @@
-﻿// VOIR.EXE - what is on the disc: the patient, the exams, their series and images, as
+﻿// VIEWER.EXE - what is on the disc: the patient, the exams, their series and images, as
 // the DICOMDIR at the top of the disc lists them. That one small file gives the whole
 // list; then the header of one image of each series is read, for its words - the
 // DICOMDIR the image server writes loses the accents ("Vsicule" for "Vésicule").

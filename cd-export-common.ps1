@@ -11,7 +11,7 @@
 #   DICOMDIR      the standard index, made by the image server
 #   IMAGES\IM0…   the original DICOM files, as the image server holds them
 #   README.TXT    written here: whose images, which exams, how to read the disc
-#   VOIR.EXE      the clinic's small viewer, built here from bethesda-cd\src (when it is there)
+#   VIEWER.EXE    the clinic's small viewer, built here from bethesda-cd\src (when it is there)
 # Nothing is installed and no system setting is changed: burning uses Windows' own
 # burning component (IMAPI2), the window is Windows' own (WinForms).
 
@@ -229,9 +229,9 @@ function Write-DiscReadme {
   $L.Add('Pour les voir : ouvrez ce disque avec votre logiciel d''imagerie (PACS ou')
   $L.Add('visionneuse DICOM), fonction « importer un CD / ouvrir un DICOMDIR ».')
   if ($WithViewer) {
-    $L.Add('Sans logiciel d''imagerie : double-cliquez sur VOIR.EXE (Windows). C''est une')
-    $L.Add('visionneuse de consultation, non destinée au diagnostic ; elle ne s''installe')
-    $L.Add('pas et ne laisse rien sur l''ordinateur.')
+    $L.Add('Sans logiciel d''imagerie : double-cliquez sur VIEWER.EXE (Windows). C''est')
+    $L.Add('une visionneuse de consultation, non destinée au diagnostic ; elle ne')
+    $L.Add('s''installe pas et ne laisse rien sur l''ordinateur.')
   }
   $L.Add('Ce disque contient des données médicales personnelles : remettez-le au patient')
   $L.Add('ou au médecin destinataire uniquement.')
@@ -252,9 +252,9 @@ function Write-DiscReadme {
   $L.Add('To see them: open this disc with your imaging software (PACS or DICOM')
   $L.Add('viewer), "import a CD / open a DICOMDIR".')
   if ($WithViewer) {
-    $L.Add('Without imaging software: double-click VOIR.EXE (Windows). It is a viewer')
-    $L.Add('for reference, not for diagnosis; it installs nothing and leaves nothing on')
-    $L.Add('the computer.')
+    $L.Add('Without imaging software: double-click VIEWER.EXE (Windows). It is a')
+    $L.Add('viewer for reference, not for diagnosis; it installs nothing and leaves')
+    $L.Add('nothing on the computer.')
   }
   $L.Add('This disc holds personal medical data: hand it to the patient or to the')
   $L.Add('receiving doctor only.')
@@ -263,7 +263,7 @@ function Write-DiscReadme {
 
 # ── the viewer on the disc ───────────────────────────────────────────────────
 # A hospital reads the disc with its own imaging software; a patient has none. So every
-# disc carries the clinic's own small viewer, VOIR.EXE: a look at the images, nothing
+# disc carries the clinic's own small viewer, VIEWER.EXE: a look at the images, nothing
 # more (EMR wiki, reference/cd-mini-viewer-design.md). Its source is beside this program
 # (bethesda-cd\src\viewer) and it is built on the spot, by the C# compiler that ships with Windows -
 # no program file is kept in the repository and nothing is installed.
@@ -273,10 +273,10 @@ function Get-ViewerSource([string]$ProgramDir) {
   if (-not (Test-Path -LiteralPath (Join-Path $dir 'viewer') -PathType Container)) { return , @() }
   return , @('shared', 'viewer' | ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $dir $_) -Filter '*.cs' -File | Sort-Object Name | ForEach-Object { $_.FullName } })
 }
-# Builds VOIR.EXE into the disc folder. Returns @{ ok; bytes; error }.
+# Builds VIEWER.EXE into the disc folder. Returns @{ ok; bytes; error }.
 function Add-DiscViewer {
   param([string]$Dir, [string[]]$Sources)
-  $exe = Join-Path $Dir 'VOIR.EXE'
+  $exe = Join-Path $Dir 'VIEWER.EXE'
   if (-not $Sources -or -not $Sources.Count) { return @{ ok = $false; error = 'no source' } }
   try {
     Add-Type -Path $Sources -ReferencedAssemblies 'System.Windows.Forms', 'System.Drawing' -OutputAssembly $exe -OutputType WindowsApplication -ErrorAction Stop
