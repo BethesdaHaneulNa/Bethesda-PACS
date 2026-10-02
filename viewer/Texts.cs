@@ -22,6 +22,9 @@ namespace Bethesda.Viewer {
       { "frames",     new[] { "{0} images dans ce fichier — la première est affichée",            "{0} frames in this file — the first is shown" } },
       { "frame",      new[] { "fichier à plusieurs images : {0} / {1} (molette)",                 "a file of several frames: {0} / {1} (wheel)" } },
       { "window",     new[] { "Fenêtre C {0}  L {1}",                                             "Window C {0}  W {1}" } },
+      { "tone",       new[] { "Luminosité {0}  Contraste {1}",                                    "Brightness {0}  Contrast {1}" } },
+      { "bright",     new[] { "Luminosité",                                                       "Brightness" } },
+      { "contrast",   new[] { "Contraste",                                                        "Contrast" } },
       { "zoom",       new[] { "zoom {0} %",                                                       "zoom {0} %" } },
       { "reading",    new[] { "Lecture de l'image…",                                              "Reading the image…" } },
       { "empty",      new[] { "Aucune image DICOM dans ce dossier.",                              "No DICOM image in this folder." } },
@@ -36,12 +39,12 @@ namespace Bethesda.Viewer {
       { "helpText",   new[] {
           "Visionneuse d'images — pour consulter les images de ce disque.\nElle n'est pas destinée au diagnostic : pour un diagnostic, ouvrez le disque avec un logiciel d'imagerie médicale (fichier DICOMDIR).\n\n" +
           "Liste de gauche : les examens et leurs séries. Cliquez sur une série.\n\n" +
-          "Molette : image précédente / suivante\nBouton gauche + glisser : luminosité et contraste (fenêtre)\nCtrl + molette : zoom\nBouton droit + glisser : déplacer l'image\nDouble-clic : ajuster à la fenêtre\n\n" +
+          "Molette : image précédente / suivante\nBouton gauche + glisser : luminosité (haut / bas) et contraste (gauche / droite) — aussi avec les deux curseurs en bas, sur les images en gris comme en couleur\nCtrl + molette : zoom\nBouton droit + glisser : déplacer l'image\nDouble-clic : ajuster à la fenêtre\n\n" +
           "Touches : ← → image   ↑ ↓ série   I inverser   R réinitialiser\n\n" +
           "Cette visionneuse ne s'installe pas et ne laisse rien sur cet ordinateur.",
           "Image viewer — for looking at the images of this disc.\nIt is not meant for diagnosis: for a diagnosis, open the disc with medical imaging software (file DICOMDIR).\n\n" +
           "List on the left: the exams and their series. Click a series.\n\n" +
-          "Wheel: previous / next image\nLeft button + drag: brightness and contrast (window)\nCtrl + wheel: zoom\nRight button + drag: move the image\nDouble-click: fit to the window\n\n" +
+          "Wheel: previous / next image\nLeft button + drag: brightness (up / down) and contrast (left / right) - also with the two sliders at the bottom, on grey and on colour images\nCtrl + wheel: zoom\nRight button + drag: move the image\nDouble-click: fit to the window\n\n" +
           "Keys: ← → image   ↑ ↓ series   I invert   R reset\n\n" +
           "This viewer installs nothing and leaves nothing on this computer." } },
     };

@@ -14,9 +14,11 @@ namespace Bethesda.Viewer {
     readonly Disc disc; readonly TreeView tree = new TreeView(); readonly ImagePanel panel = new ImagePanel();
     readonly Label where = new Label(), notice = new Label();
     readonly Button prev = new Button(), next = new Button(), fit = new Button(), invert = new Button(), reset = new Button(), help = new Button();
+    readonly TrackBar bright = new TrackBar(), contrast = new TrackBar(); readonly Label brightSign = new Label(), contrastSign = new Label();
+    readonly ToolTip tips = new ToolTip();
 
     Series series; int index = -1, frame; Picture picture;
-    double center, width; bool inverted;
+    double center, width, center0, width0; bool inverted, dragging, syncing;     // center0, width0: the window the picture started with
 
     // what a test (or a person) can ask
     public Disc Disc { get { return disc; } }
@@ -58,12 +60,17 @@ namespace Bethesda.Viewer {
       help.Dock = DockStyle.Right; reset.Dock = DockStyle.Right; invert.Dock = DockStyle.Right; fit.Dock = DockStyle.Right;
       prev.Dock = DockStyle.Left; next.Dock = DockStyle.Left;
       where.Dock = DockStyle.Fill; where.TextAlign = ContentAlignment.MiddleLeft; where.Padding = new Padding(10, 0, 0, 0); where.AutoEllipsis = true;
-      bar.Controls.Add(where); bar.Controls.Add(next); bar.Controls.Add(prev); bar.Controls.Add(fit); bar.Controls.Add(invert); bar.Controls.Add(reset); bar.Controls.Add(help);
+      // brightness and contrast, in sight: two small sliders that move the same window the mouse drags
+      Slider(bright, brightSign, "\u2600", Texts.Get("bright")); Slider(contrast, contrastSign, "\u25D0", Texts.Get("contrast"));
+      bar.Controls.Add(where); bar.Controls.Add(next); bar.Controls.Add(prev);
+      bar.Controls.Add(brightSign); bar.Controls.Add(bright); bar.Controls.Add(contrastSign); bar.Controls.Add(contrast);
+      bar.Controls.Add(fit); bar.Controls.Add(invert); bar.Controls.Add(reset); bar.Controls.Add(help);
       notice.Dock = DockStyle.Bottom; notice.Height = 24; notice.TextAlign = ContentAlignment.MiddleLeft; notice.Padding = new Padding(8, 0, 0, 0);
       notice.Text = Texts.Get("notice"); notice.Font = new Font(Font, FontStyle.Bold); notice.BackColor = Color.FromArgb(255, 244, 214); notice.ForeColor = Color.FromArgb(90, 60, 0);
 
       panel.Dock = DockStyle.Fill;
       panel.Windowing += delegate(int dx, int dy) { DragWindow(dx, dy); };
+      panel.WindowingEnded += delegate { EndDrag(); };
       panel.Step += delegate(int by) { StepFrame(by); };
       panel.ViewChanged += delegate { Corners(); panel.Invalidate(); };
       Splitter split = new Splitter { Dock = DockStyle.Left, Width = 4 };
@@ -76,6 +83,13 @@ namespace Bethesda.Viewer {
         foreach (Study st in disc.Studies) { foreach (Series se in st.Series) if (se.Images.Count > 0) { firstSeries = se; break; } if (firstSeries != null) break; }
         Shown += delegate { if (firstSeries != null) Select(firstSeries); panel.Focus(); };
       }
+    }
+    void Slider(TrackBar t, Label sign, string glyph, string tip) {
+      t.AutoSize = false; t.Dock = DockStyle.Right; t.Width = 78; t.Minimum = -100; t.Maximum = 100; t.TickStyle = TickStyle.None; t.SmallChange = 2; t.LargeChange = 10; t.TabStop = false;
+      sign.Dock = DockStyle.Right; sign.Width = 20; sign.Text = glyph; sign.TextAlign = ContentAlignment.MiddleRight; sign.Font = new Font("Segoe UI Symbol", 10f);
+      tips.SetToolTip(t, tip); tips.SetToolTip(sign, tip);
+      t.Scroll += delegate { if (!syncing) FromSliders(true); };
+      t.MouseUp += delegate { FromSliders(false); panel.Focus(); };
     }
     void Setup(Button b, string text, int w, EventHandler click) { b.Text = text; b.Width = w; b.FlatStyle = FlatStyle.System; b.TabStop = false; b.Click += click; b.Margin = new Padding(3); }
 
@@ -95,7 +109,7 @@ namespace Bethesda.Viewer {
       index = i; frame = 0; picture = Picture.Open(series.Images[i].File); inverted = false;
       if (picture.Problem == "") {
         Cursor = Cursors.WaitCursor;
-        try { picture.DefaultWindow(out center, out width); panel.Message = ""; panel.Show(picture.Render(0, center, width, inverted), picture.AspectY, false); }
+        try { picture.DefaultWindow(out center, out width); center0 = center; width0 = width; panel.Message = ""; panel.Show(picture.Render(0, center, width, inverted), picture.AspectY, false); }
         catch (Exception) { picture.Problem = "unreadable"; }
         Cursor = Cursors.Default;
       }
@@ -116,22 +130,53 @@ namespace Bethesda.Viewer {
       int i = all.IndexOf(series) + by; if (series != null && i >= 0 && i < all.Count) Select(all[i]);
     }
 
-    // The window of grey levels, as the mouse drags it: sideways the width, up and down the centre.
+    // Brightness and contrast. A grey picture is shown through a window of its values (a
+    // centre and a width); a colour picture through the same kind of window over 0..255,
+    // applied alike to red, green and blue. The mouse drags that window - up and down the
+    // centre (up is brighter), sideways the width (to the left is harder) - and the two
+    // sliders move the same two numbers.
+    double Range() { return picture.IsGrey ? Math.Max(256, (picture.High - picture.Low) * picture.Slope) : 256; }
     public void SetWindow(double c, double w) {
-      if (picture == null || picture.Problem != "" || !picture.IsGrey) return;
+      if (picture == null || picture.Problem != "") return;
       center = c; width = Math.Max(1, w); Redraw();
     }
-    void DragWindow(int dx, int dy) {
-      if (picture == null || picture.Problem != "" || !picture.IsGrey) return;
-      double range = Math.Max(256, (picture.High - picture.Low) * picture.Slope), unit = range / 600.0;
-      SetWindow(center + dy * unit, width + dx * unit);
+    public void DragWindow(int dx, int dy) {
+      if (picture == null || picture.Problem != "") return;
+      double unit = Range() / 600.0;
+      center += dy * unit; width = Math.Max(1, width + dx * unit);
+      dragging = true; Draw(true);
     }
+    public void EndDrag() { if (dragging) { dragging = false; if (picture != null && picture.Problem == "") Redraw(); } }
+    void FromSliders(bool quickly) {
+      if (picture == null || picture.Problem != "") return;
+      center = center0 - bright.Value * Range() / 200.0; width = Math.Max(1, width0 / Math.Pow(2, contrast.Value / 50.0));
+      if (quickly) { dragging = true; Draw(true); panel.Update(); } else { dragging = false; Redraw(); }
+    }
+    // Where the sliders stand for the window as it is now.
+    void Sliders() {
+      bool can = picture != null && picture.Problem == "";
+      syncing = true;
+      bright.Value = can ? Clamp((center0 - center) / Range() * 200) : 0;
+      contrast.Value = can ? Clamp(50 * Math.Log(width0 / Math.Max(1e-6, width), 2)) : 0;
+      syncing = false;
+    }
+    static int Clamp(double v) { return double.IsNaN(v) ? 0 : (int)Math.Round(Math.Max(-100, Math.Min(100, v))); }
+    public int Brightness { get { return bright.Value; } }
+    public int Contrast { get { return contrast.Value; } }
+
     public void ToggleInvert() { if (picture != null && picture.Problem == "") { inverted = !inverted; Redraw(); } }
     public void ResetView() {
       if (picture == null || picture.Problem != "") return;
       inverted = false; picture.DefaultWindow(out center, out width); Redraw(); panel.Fit();
     }
-    void Redraw() { panel.Show(picture.Render(frame, center, width, inverted), picture.AspectY, true); Corners(); panel.Invalidate(); }
+    void Redraw() { Draw(false); }
+    // quickly: while the mouse drags, the picture is made at once in the size it has on the
+    // screen (unless it is enlarged so far that this would be larger than the picture itself).
+    void Draw(bool quickly) {
+      Size on = panel.ShownSize; bool small = quickly && on.Width > 0 && on.Height > 0 && (long)on.Width * on.Height <= Math.Max(4000000, (long)picture.Cols * picture.Rows);
+      panel.Show(small ? picture.Render(frame, center, width, inverted, on.Width, on.Height) : picture.Render(frame, center, width, inverted), picture.AspectY, true, picture.Cols, picture.Rows);
+      Corners(); Sliders(); panel.Invalidate();
+    }
 
     // The four corners of the picture: whose it is, which exam, which image, how it is shown.
     void Corners() {
@@ -144,15 +189,17 @@ namespace Bethesda.Viewer {
       string view = "";
       if (picture.Problem == "") {
         if (picture.IsGrey) view = Texts.Get("window", Math.Round(center).ToString(CultureInfo.InvariantCulture), Math.Round(width).ToString(CultureInfo.InvariantCulture)) + "\n";
+        else if (center != center0 || width != width0) view = Texts.Get("tone", Signed(Clamp((center0 - center) / Range() * 200)), Signed(Clamp(50 * Math.Log(width0 / Math.Max(1e-6, width), 2)))) + "\n";
         view += Texts.Get("zoom", Math.Round(panel.Zoom * 100));
       }
       panel.BottomRight = view;
       where.Text = at + (picture.Problem != "" || picture.Frames <= 1 ? "" : "   —   " + (picture.Steps > 1 ? Texts.Get("frame", frame + 1, picture.Steps) : Texts.Get("frames", picture.Frames)));
     }
+    static string Signed(int v) { return (v > 0 ? "+" : "") + v.ToString(CultureInfo.InvariantCulture); }
     void Buttons() {
       bool can = picture != null && picture.Problem == "";
       prev.Enabled = series != null && index > 0; next.Enabled = series != null && index < series.Images.Count - 1;
-      fit.Enabled = invert.Enabled = reset.Enabled = can;
+      fit.Enabled = invert.Enabled = reset.Enabled = bright.Enabled = contrast.Enabled = can; Sliders();
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData) {

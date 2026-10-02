@@ -30,6 +30,8 @@ namespace Bethesda.Viewer {
     DataSet d; Element px;
     ushort[] grey; int[] colour; int loadedFrame = -1;
     Bitmap bitmap; int[] argb;
+    Bitmap quick; int[] quickArgb, quickX;                               // the same picture at the size it has on the screen: drawn while the mouse drags
+    int[] lut;                                                           // stored value -> what the screen shows (kept: made anew it is large enough to stall the program)
     int[] starts;                                                        // compressed, several frames: the fragment each frame begins at
     int[][] palette; int paletteFirst;                                   // PALETTE COLOR: the red, green, blue of every stored value
 
@@ -179,7 +181,7 @@ namespace Bethesda.Viewer {
       if (Coding == "windows") {
         int[] rgb = Jpeg.ByWindows(FrameBytes(frame, int.MaxValue), Samples != 3 ? "" : Photometric == "RGB" ? "rgb" : "ybr", out w, out h);
         if (w != Cols || h != Rows) throw new InvalidDataException("size");
-        if (Samples == 3) colour = rgb; else { ushort[] g = new ushort[count]; for (int i = 0; i < count; i++) g[i] = (ushort)(rgb[i] & 0xFF); Grey(g); }
+        if (Samples == 3) { colour = rgb; Center = 128; Width = 256; } else { ushort[] g = new ushort[count]; for (int i = 0; i < count; i++) g[i] = (ushort)(rgb[i] & 0xFF); Grey(g); }
       } else {
         ushort[] v;
         if (Coding == "lossless") { int c, b; v = Jpeg.Lossless(FrameBytes(frame, int.MaxValue), out w, out h, out c, out b); if (w != Cols || h != Rows || c != Samples) throw new InvalidDataException("size"); }
@@ -205,6 +207,7 @@ namespace Bethesda.Viewer {
           int k = v[i] - paletteFirst;
           colour[i] = unchecked((int)0xFF000000) | (Entry(0, k) << 16) | (Entry(1, k) << 8) | Entry(2, k);
         }
+        Center = 128; Width = 256;
         return;
       }
       grey = v;
@@ -227,6 +230,9 @@ namespace Bethesda.Viewer {
         }
         colour[i] = unchecked((int)0xFF000000) | (r << 16) | (g << 8) | b;
       }
+      // A colour picture has no window of its own: 128 / 256 shows it as it is, and moving
+      // that window makes it brighter or darker, harder or softer - the same for red, green and blue.
+      Center = 128; Width = 256;
     }
     static int Byte(double x) { int n = (int)Math.Round(x); return n < 0 ? 0 : n > 255 ? 255 : n; }
 
@@ -235,36 +241,61 @@ namespace Bethesda.Viewer {
 
     // Frame `frame` drawn through the window (centre, width), turned over when asked.
     // The bitmap is this object's own: it is drawn into again at the next call.
-    public Bitmap Render(int frame, double center, double width, bool invert) {
+    public Bitmap Render(int frame, double center, double width, bool invert) { return Render(frame, center, width, invert, 0, 0); }
+
+    // (outW, outH) given: the picture made at once in that size - the size it has on the
+    // screen - by taking the nearest pixel. It is quick to make and needs no scaling to be
+    // put on the screen: for the moments the mouse is dragging the window. (0, 0): in full.
+    public Bitmap Render(int frame, double center, double width, bool invert, int outW, int outH) {
       if (Problem != "") return null;
       Load(frame);
-      int count = Rows * Cols;
-      if (argb == null) argb = new int[count];
-      if (!IsGrey) {
-        if (invert) { for (int i = 0; i < count; i++) argb[i] = colour[i] ^ 0x00FFFFFF; } else Array.Copy(colour, argb, count);
-      } else {
-        // every stored value -> a grey of the screen, once; then one look-up a pixel
-        int n = 1 << BitsStored, sign = 1 << (BitsStored - 1); int[] lut = new int[n];
-        bool turned = (Photometric == "MONOCHROME1") != invert;
-        double lo = center - 0.5 - (width - 1) / 2, hi = center - 0.5 + (width - 1) / 2;
-        for (int v = 0; v < n; v++) {
-          int x = Signed && (v & sign) != 0 ? v - n : v;
-          double val = x * Slope + Intercept, y;
-          if (width <= 1) y = val <= center - 0.5 ? 0 : 255;
-          else if (val <= lo) y = 0; else if (val > hi) y = 255; else y = ((val - (center - 0.5)) / (width - 1) + 0.5) * 255;
-          int g = (int)Math.Round(y); if (g < 0) g = 0; if (g > 255) g = 255; if (turned) g = 255 - g;
-          lut[v] = unchecked((int)0xFF000000) | (g << 16) | (g << 8) | g;
+      bool whole = outW <= 0 || outH <= 0;
+      int w = whole ? Cols : outW, h = whole ? Rows : outH; int[] to;
+      if (whole) { if (argb == null) argb = new int[Rows * Cols]; to = argb; }
+      else {
+        if (quick == null || quick.Width != w || quick.Height != h) {
+          if (quick != null) quick.Dispose();
+          quick = new Bitmap(w, h, PixelFormat.Format32bppRgb); quickArgb = new int[w * h]; quickX = new int[w];
+          for (int x = 0; x < w; x++) quickX[x] = Math.Min(Cols - 1, (int)((x + 0.5) * Cols / w));
         }
-        for (int i = 0; i < count; i++) argb[i] = lut[grey[i]];
+        to = quickArgb;
       }
-      if (bitmap == null) bitmap = new Bitmap(Cols, Rows, PixelFormat.Format32bppRgb);
-      BitmapData bd = bitmap.LockBits(new Rectangle(0, 0, Cols, Rows), ImageLockMode.WriteOnly, PixelFormat.Format32bppRgb);
-      for (int y = 0; y < Rows; y++) Marshal.Copy(argb, y * Cols, IntPtr.Add(bd.Scan0, y * bd.Stride), Cols);
-      bitmap.UnlockBits(bd);
-      return bitmap;
+      // every stored value -> what the screen shows, once; then one look-up a pixel
+      bool isGrey = IsGrey; int n = isGrey ? 1 << BitsStored : 256, sign = 1 << (BitsStored - 1);
+      if (lut == null || lut.Length != n) lut = new int[n];
+      bool turned = isGrey ? (Photometric == "MONOCHROME1") != invert : invert;
+      double lo = center - 0.5 - (width - 1) / 2, hi = center - 0.5 + (width - 1) / 2;
+      for (int v = 0; v < n; v++) {
+        int s = isGrey && Signed && (v & sign) != 0 ? v - n : v;
+        double val = isGrey ? s * Slope + Intercept : s, shown;
+        if (width <= 1) shown = val <= center - 0.5 ? 0 : 255;
+        else if (val <= lo) shown = 0; else if (val > hi) shown = 255; else shown = ((val - (center - 0.5)) / (width - 1) + 0.5) * 255;
+        int g = (int)Math.Round(shown); if (g < 0) g = 0; if (g > 255) g = 255; if (turned) g = 255 - g;
+        lut[v] = isGrey ? unchecked((int)0xFF000000) | (g << 16) | (g << 8) | g : g;
+      }
+      int[] t = lut, xs = quickX; const int opaque = unchecked((int)0xFF000000);
+      if (isGrey) {
+        ushort[] src = grey;
+        if (whole) { int count = Rows * Cols; for (int i = 0; i < count; i++) to[i] = t[src[i]]; }
+        else for (int y = 0, k = 0; y < h; y++) { int row = Math.Min(Rows - 1, (int)((y + 0.5) * Rows / h)) * Cols; for (int x = 0; x < w; x++) to[k++] = t[src[row + xs[x]]]; }
+      } else {
+        int[] src = colour;
+        if (whole) { int count = Rows * Cols; for (int i = 0; i < count; i++) { int c = src[i]; to[i] = opaque | (t[(c >> 16) & 255] << 16) | (t[(c >> 8) & 255] << 8) | t[c & 255]; } }
+        else for (int y = 0, k = 0; y < h; y++) {
+          int row = Math.Min(Rows - 1, (int)((y + 0.5) * Rows / h)) * Cols;
+          for (int x = 0; x < w; x++) { int c = src[row + xs[x]]; to[k++] = opaque | (t[(c >> 16) & 255] << 16) | (t[(c >> 8) & 255] << 8) | t[c & 255]; }
+        }
+      }
+      Bitmap b;
+      if (whole) { if (bitmap == null) bitmap = new Bitmap(Cols, Rows, PixelFormat.Format32bppRgb); b = bitmap; } else b = quick;
+      BitmapData bd = b.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppRgb);
+      if (bd.Stride == w * 4) Marshal.Copy(to, 0, bd.Scan0, w * h);
+      else for (int y = 0; y < h; y++) Marshal.Copy(to, y * w, IntPtr.Add(bd.Scan0, y * bd.Stride), w);
+      b.UnlockBits(bd);
+      return b;
     }
 
     // Let go of the pixels (the picture is no longer on the screen).
-    public void Dispose() { if (bitmap != null) bitmap.Dispose(); bitmap = null; argb = null; grey = null; colour = null; loadedFrame = -1; }
+    public void Dispose() { if (bitmap != null) bitmap.Dispose(); if (quick != null) quick.Dispose(); bitmap = quick = null; argb = quickArgb = quickX = null; lut = null; grey = null; colour = null; loadedFrame = -1; }
   }
 }

@@ -8,12 +8,14 @@ using System.Windows.Forms;
 
 namespace Bethesda.Viewer {
   public class ImagePanel : Control {
-    Bitmap picture; double aspectY = 1;
+    Bitmap picture; double aspectY = 1; Size full;                 // full: the picture's own size (the bitmap may be a smaller, quick one)
+    bool moved;
     bool fitted = true; double zoom = 1; PointF origin;          // where the picture's top-left corner is, in the panel
     Point last; MouseButtons held = MouseButtons.None;
     public string TopLeft = "", TopRight = "", BottomLeft = "", BottomRight = "", Message = "";
 
     public event Action<int, int> Windowing;                     // left button dragged: (dx, dy) in pixels of the screen
+    public event Action WindowingEnded;                          // ... and let go
     public event Action<int> Step;                               // the wheel: -1 previous, +1 next
     public event Action ViewChanged;                             // the zoom changed
 
@@ -23,19 +25,24 @@ namespace Bethesda.Viewer {
     }
 
     public double Zoom { get { return zoom; } }
+    // The size the whole picture has on the screen, in whole pixels.
+    public Size ShownSize { get { SizeF s = Shown; return new Size((int)Math.Round(s.Width), (int)Math.Round(s.Height)); } }
     public bool Fitted { get { return fitted; } }
 
     // A new picture (or none). `keepView` keeps the zoom and the place - the same picture drawn again.
-    public void Show(Bitmap b, double aspect, bool keepView) {
+    public void Show(Bitmap b, double aspect, bool keepView) { Show(b, aspect, keepView, 0, 0); }
+    // (width, height): the size of the whole picture when `b` is a smaller drawing of it.
+    public void Show(Bitmap b, double aspect, bool keepView, int width, int height) {
       picture = b; aspectY = aspect <= 0 ? 1 : aspect;
-      if (!keepView || fitted) Fit(); else Invalidate();
+      full = b == null ? Size.Empty : width > 0 && height > 0 ? new Size(width, height) : b.Size;
+      if (!keepView) Fit(); else Invalidate();
     }
-    SizeF Shown { get { return picture == null ? SizeF.Empty : new SizeF((float)(picture.Width * zoom), (float)(picture.Height * aspectY * zoom)); } }
+    SizeF Shown { get { return picture == null ? SizeF.Empty : new SizeF((float)(full.Width * zoom), (float)(full.Height * aspectY * zoom)); } }
 
     public void Fit() {
       fitted = true;
       if (picture != null && ClientSize.Width > 0 && ClientSize.Height > 0) {
-        zoom = Math.Min(ClientSize.Width / (double)picture.Width, ClientSize.Height / (picture.Height * aspectY));
+        zoom = Math.Min(ClientSize.Width / (double)full.Width, ClientSize.Height / (full.Height * aspectY));
         SizeF s = Shown; origin = new PointF((ClientSize.Width - s.Width) / 2, (ClientSize.Height - s.Height) / 2);
       }
       Invalidate(); if (ViewChanged != null) ViewChanged();
@@ -49,14 +56,21 @@ namespace Bethesda.Viewer {
     }
 
     protected override void OnResize(EventArgs e) { base.OnResize(e); if (fitted) Fit(); }
-    protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); Focus(); held = e.Button; last = e.Location; }
-    protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); held = MouseButtons.None; }
+    protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); Focus(); held = e.Button; last = e.Location; moved = false; }
+    protected override void OnMouseUp(MouseEventArgs e) {
+      base.OnMouseUp(e);
+      bool windowed = held == MouseButtons.Left && moved, dragged = moved; held = MouseButtons.None; moved = false;
+      if (windowed && WindowingEnded != null) WindowingEnded(); else if (dragged) Invalidate();      // drawn once more, smoothly
+    }
     protected override void OnMouseMove(MouseEventArgs e) {
       base.OnMouseMove(e);
       int dx = e.X - last.X, dy = e.Y - last.Y; if (held == MouseButtons.None || (dx == 0 && dy == 0)) return;
-      last = e.Location;
+      last = e.Location; moved = true;
       if (held == MouseButtons.Left) { if (Windowing != null) Windowing(dx, dy); }
       else if (held == MouseButtons.Right || held == MouseButtons.Middle) { origin = new PointF(origin.X + dx, origin.Y + dy); fitted = false; Invalidate(); }
+      // Drawn now, not "when there is time": Windows hands over the next mouse move before
+      // it lets a window paint, so a picture left to be painted later moves in jerks.
+      Update();
     }
     protected override void OnMouseWheel(MouseEventArgs e) {
       base.OnMouseWheel(e);
@@ -69,9 +83,15 @@ namespace Bethesda.Viewer {
       Graphics g = e.Graphics; g.Clear(BackColor);
       if (picture != null) {
         // shrunk pictures are smoothed; enlarged ones show their own pixels
-        g.InterpolationMode = zoom >= 2 ? InterpolationMode.NearestNeighbor : InterpolationMode.Bilinear;
+        // While the mouse drags, speed comes first (nearest pixel); at rest the picture is smoothed.
+        g.InterpolationMode = zoom >= 2 || (held != MouseButtons.None && moved) ? InterpolationMode.NearestNeighbor : InterpolationMode.Bilinear;
+        g.CompositingMode = CompositingMode.SourceCopy;                  // nothing shows through the picture: no blending to work out
         g.PixelOffsetMode = PixelOffsetMode.Half;
-        SizeF s = Shown; g.DrawImage(picture, new RectangleF(origin.X, origin.Y, s.Width, s.Height));
+        SizeF s = Shown; Size whole = ShownSize;
+        // a drawing already made in the size it has on the screen is copied, not scaled
+        if (picture.Width == whole.Width && picture.Height == whole.Height) g.DrawImageUnscaled(picture, (int)Math.Round(origin.X), (int)Math.Round(origin.Y));
+        else g.DrawImage(picture, new RectangleF(origin.X, origin.Y, s.Width, s.Height));
+        g.CompositingMode = CompositingMode.SourceOver;
       }
       using (Font f = new Font("Segoe UI", 9f)) using (SolidBrush ink = new SolidBrush(ForeColor)) using (SolidBrush shade = new SolidBrush(Color.FromArgb(150, 0, 0, 0))) {
         Corner(g, f, ink, shade, TopLeft, false, false); Corner(g, f, ink, shade, TopRight, true, false);
