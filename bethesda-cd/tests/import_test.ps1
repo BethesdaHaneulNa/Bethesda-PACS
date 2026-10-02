@@ -227,6 +227,7 @@ try {
   Check '  an exam the EMR already has for this patient: cannot be ticked, and says since when' ((Row $B).Cells[0].ReadOnly -and [string](Row $B).Cells[8].Value -match '2026-09-30') ([string](Row $B).Cells[8].Value)
   (Row $B).Cells[0].Value = $true; Tick $A
   Check '  one ticked (a tick forced on the refused one does not count): 3 images, the button is on, the room is shown' ($form.ChosenStudies().Count -eq 1 -and $form.ImportSelection.Text -match '(?<!\d)3(?!\d)' -and $form.ImportButton.Enabled -and $form.RoomLine.Text.Length -gt 5) "$($form.ImportSelection.Text) | $($form.RoomLine.Text)"
+  (Row $B).Cells[0].Value = $false                    # (the picture shows the window as a person sees it)
   Shot 'chosen'
 
   '4. the question, answered no'
