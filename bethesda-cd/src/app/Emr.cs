@@ -152,6 +152,22 @@ namespace Bethesda.Cd {
         }
         Answer(req, o, null, null);
       } catch (Exception e) {
+        // The EMR may have refused the file before all of it was sent (too large, the import closed)
+        // and shut the line: what it answered says why, and sending the file again would not help.
+        if (o.Code == "" && !discFailed && req != null) {
+          EmrAnswer early = new EmrAnswer();
+          try {
+            WebException we = e as WebException; HttpWebResponse got = we == null ? null : we.Response as HttpWebResponse;
+            if (got != null) { using (got) { early.Status = (int)got.StatusCode; early.Data = J.Parse(new StreamReader(got.GetResponseStream(), Encoding.UTF8).ReadToEnd()); } }
+            else Answer(req, early, null, null);
+          } catch (Exception) { }
+          if (early.Status >= 400) {
+            early.Ok = false; if (early.Code == "") early.Code = J.Str(early.Data, "code") != "" ? J.Str(early.Data, "code") : "HTTP_" + early.Status;
+            if (early.Error == "") early.Error = J.Str(early.Data, "error");
+            try { req.Abort(); } catch (Exception) { }
+            return early;
+          }
+        }
         // the disc could not be read (a scratched CD, a stick pulled out) - or the connection broke
         o.Ok = false; if (o.Code == "") o.Code = discFailed ? "UNREADABLE" : "BROKEN"; o.Error = e.Message;
         try { if (req != null) req.Abort(); } catch (Exception) { }

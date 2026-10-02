@@ -557,7 +557,7 @@ namespace Bethesda.Cd {
     string Refusal(EmrAnswer r) {
       string c = r.Code;
       if (c == "NO_ROOM") return Texts.Error("NO_ROOM_SERVER", "", DiscFolder.FormatSize(J.Long(r.Data, "needed_bytes"), Texts.Unit), DiscFolder.FormatSize(J.Long(r.Data, "free_bytes"), Texts.Unit));
-      if (c == "TOO_BIG_FILE") return Texts.Error("TOO_BIG_FILE", "", DiscFolder.FormatSize(J.Long(r.Data, "max_file_bytes"), Texts.Unit));
+      if (c == "TOO_BIG_FILE" || c == "HTTP_413") return Texts.Error("TOO_BIG_FILE", "", DiscFolder.FormatSize(J.Long(r.Data, "max_file_bytes") > 0 ? J.Long(r.Data, "max_file_bytes") : Math.Max(0, Limit("max_file_bytes")), Texts.Unit));
       if (c == "INCOMPLETE") return Texts.Error("INCOMPLETE", "", J.Str(r.Data, "on_server"), J.Str(r.Data, "announced"));
       if (c == "NOT_LOGGED") return Texts.Error("NOT_LOGGED_IMPORT", "");
       if (c == "BROKEN" || c == "NO_ANSWER" || c == "HTTP_502" || c == "HTTP_503" || c == "HTTP_504") return Texts.Error("BROKEN_IMPORT", "");

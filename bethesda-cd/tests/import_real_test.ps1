@@ -15,9 +15,15 @@
 # which one at the end. Take it out in the EMR (Imaging - External imaging) or reset the test
 # installation. Each run uses new exam numbers, so it can be run again without that.
 # On this PC nothing is left: the disc is made in %TEMP% and removed.
+#
+#   -RealDisc D:\a\disc  also brings in the exams of that disc folder (read only) - those that the EMR
+#                does not have yet, of the first patient on it. They stay in the test EMR too.
+#   -OverLimit   also sends one file that is larger than the EMR allows (the window itself never
+#                would: it greys such an exam), to see how the refusal arrives. It writes a file of
+#                that size (zeros) in %TEMP% for the time of the test - 1 GB with the usual limit.
 param(
   [Parameter(Mandatory = $true)][string]$Emr, [Parameter(Mandatory = $true)][string]$Login, [Parameter(Mandatory = $true)][string]$Chart,
-  [string]$Exe = '', [ValidateSet('fr', 'ko', 'en')][string]$Lang = 'fr', [string]$Shots = ''
+  [string]$Exe = '', [ValidateSet('fr', 'ko', 'en')][string]$Lang = 'fr', [string]$Shots = '', [switch]$OverLimit, [string]$RealDisc = ''
 )
 $ErrorActionPreference = 'Stop'
 if (-not $Exe) { $Exe = Join-Path $PSScriptRoot '..\build\Bethesda-CD.exe' }
@@ -53,7 +59,7 @@ $sumA = 0; Get-ChildItem (Join-Path $disc 'DICOM\ST1') -File | ForEach-Object { 
 [Bethesda.Cd.Ask]::SamePatient = [Func[Bethesda.Cd.ConfirmInfo, bool]] { param($info) $script:asked = $info; [bool]$script:same }
 [Bethesda.Cd.Texts]::Lang = $Lang
 $ini = Join-Path $work 'test.ini'
-$form = $null; $left = ''
+$form = $null; $left = @()
 try {
   $form = New-Object Bethesda.Cd.MainForm([Bethesda.Cd.Config]::Read($ini)); Show-Quietly $form
   function Shot([string]$name) {
@@ -106,7 +112,7 @@ try {
   [void]$form.Search(); $mine = @(Ours)
   Check '  the EMR lists it for this patient: 3 images, the size of the files, where it came from' (@(Brought).Count -eq $had + 1 -and $mine.Count -eq 1 -and [int]$mine[0]['image_count'] -eq 3 -and [long]$mine[0]['bytes'] -eq $sumA -and $mine[0]['institution'] -eq 'TEST-BCD' -and $mine[0]['came_as']['patient_id'] -eq $discId) "$(@(Brought).Count) listed; ours: $($mine.Count)"
   if ($mine.Count) {
-    $left = "import $($mine[0]['id']), '$($mine[0]['description'])', study $A"
+    $left += "import $($mine[0]['id']), '$($mine[0]['description'])', study $A"
     Check '  ... with what the person confirmed about the day of birth and the sex' ([bool]$mine[0]['birth_differed'] -eq [bool]$script:asked.BirthDiffers -and [bool]$mine[0]['sex_differed'] -eq [bool]$script:asked.SexDiffers) "birth_differed=$($mine[0]['birth_differed']) sex_differed=$($mine[0]['sex_differed'])"
   }
   Shot 'done'
@@ -121,12 +127,58 @@ try {
   (Row $A).Cells[0].Value = $false
 
   '6. stopped by the person half-way'
-  Tick $B; $script:said.Clear(); $script:pressed = $false; $sentWhenPressed = ''
-  $press = [Action[string, int]] { param($text, $percent) if (-not $script:pressed -and $percent -gt 0) { $script:pressed = $true; $script:sentWhenPressed = $text; $form.StopButton.PerformClick() } }
+  Tick $B; $script:said.Clear(); $script:pressed = $false; $script:sentWhenPressed = ''; $script:asked = $null
+  # pressed once the question has been answered and at least one of the eight files has gone (12 % a file)
+  $press = [Action[string, int]] { param($text, $percent) if (-not $script:pressed -and $null -ne $script:asked -and $percent -ge 12) { $script:pressed = $true; $script:sentWhenPressed = "$text ($percent %)"; $form.StopButton.PerformClick() } }
   $form.add_StatusShown($press); $r = $form.Import(); $form.remove_StatusShown($press)
-  Check '  the button stops the sending; nothing is counted as brought in' ($script:pressed -and $r.Cancelled -and -not $r.Ok -and $r.Imported -eq 0 -and -not $form.Busy) "pressed at: $($script:sentWhenPressed) | $($r.Code) | $($script:said -join ' | ')"
+  Check '  the button stops the sending; nothing is counted as brought in; said' ($script:pressed -and $r.Cancelled -and -not $r.Ok -and $r.Imported -eq 0 -and -not $form.Busy -and $script:said.Count -eq 1) "pressed at: $($script:sentWhenPressed) | $($r.Code) | $($script:said -join ' | ')"
   [void]$form.Search(); $form.CheckSource(); $form.FillImportGrid()
   Check '  the EMR took back what it had got: not in the chart, and the exam can be brought in again' (@(Brought).Count -eq $had + 1 -and (Row $B).Tag.State -eq '' -and -not (Row $B).Cells[0].ReadOnly) "listed: $(@(Brought).Count); state of the stopped exam: '$((Row $B).Tag.State)'"
+
+  if ($OverLimit) {
+    '7. a file over the limit, sent all the same'
+    $max = [Bethesda.Cd.J]::Long($form.ImportInfo, 'max_file_bytes'); $room = (Get-PSDrive ($work.Substring(0, 1))).Free
+    if ($max -le 0 -or $max -gt 4GB -or $room -lt ($max + 2GB)) { "  skipped: limit $max bytes, free on this PC's temp drive $room bytes" }
+    else {
+      $big = Join-Path $work 'over.bin'; $fs = [IO.File]::Create($big); $fs.SetLength($max + 1MB); $fs.Close()
+      $pid0 = [int][Bethesda.Cd.J]::Long([Bethesda.Cd.J]::Dict($form.ImportInfo, 'patient'), 'id')
+      $bg = $form.Emr.Post('/api/pacs/import/begin', @{ patient_id = $pid0; files = (Row $B).Tag.Files.Count; bytes = (Row $B).Tag.Bytes; source = [Bethesda.Cd.ImportDisc]::Origin((Row $B).Tag); confirm = @{ birth_differs = $true; sex_differs = $false } }, 120)
+      if (-not $bg.Ok) { Check '  (an import could be opened for it)' $false "$($bg.Status) $($bg.Code)" }
+      else {
+        $id = [Bethesda.Cd.J]::Str($bg.Data, 'import_id'); $watch = [Diagnostics.Stopwatch]::StartNew()
+        $put = $form.Emr.PutFile("/api/pacs/import/$id/instance", $big, $null, $null, 900); $watch.Stop()
+        Check '  the EMR refuses it, and the program hears why (not "the connection broke")' (-not $put.Ok -and ($put.Code -eq 'TOO_BIG_FILE' -or $put.Code -eq 'HTTP_413')) "$($put.Status) $($put.Code) after $([int]$watch.Elapsed.TotalSeconds) s, $($put.Bytes) bytes sent | $($put.Error)"
+        $cn = $form.Emr.Post("/api/pacs/import/$id/cancel", @{ reason = 'test: a file over the limit' }, 120)
+        [void]$form.Search(); $form.CheckSource(); $form.FillImportGrid()
+        Check '  the import is taken back; the exam can be brought in again' ($cn.Ok -and @(Brought).Count -eq $had + 1 -and (Row $B).Tag.State -eq '') "cancel: $($cn.Status) $($cn.Code); state: '$((Row $B).Tag.State)'"
+      }
+      [IO.File]::Delete($big)
+    }
+  }
+
+  if ($RealDisc) {
+    '8. a disc folder that was not made by this test'
+    $ids = @(Brought | ForEach-Object { [int]$_['id'] })
+    $ok = $form.LoadSource($RealDisc); $src = $form.Source
+    Check '  read: its exams, whose they are, what the EMR knows of them' ($ok -and $src.Studies.Count -ge 1 -and $form.CheckError -eq '') "$($src.Studies.Count) exam(s), $($src.FileCount) file(s), from its DICOMDIR: $($src.FromDicomdir) | $($form.DiscLine.Text)"
+    foreach ($r in $form.ImportGrid.Rows) { "    $($r.Tag.DateShown) $($r.Tag.Modality) '$($r.Tag.Description)' $($r.Tag.Files.Count) file(s) $($r.Tag.Bytes) bytes  state='$($r.Tag.State)'" }
+    $free = @($form.ImportGrid.Rows | Where-Object { $_.Tag.State -eq '' -and $_.Tag.PatientKey -eq $src.Studies[0].PatientKey })
+    if ($free.Count -eq 0) { '  nothing of it can be brought in (the EMR has it already, or refuses it) - nothing sent' }
+    else {
+      $want = 0; foreach ($r in $free) { $r.Cells[0].Value = $true; $want += $r.Tag.Files.Count }
+      [Windows.Forms.Application]::DoEvents(); $form.UpdateImport(); $script:said.Clear(); $script:asked = $null
+      $r = $form.Import()
+      "  the question: disc '$($script:asked.DiscName)' $($script:asked.DiscBirth) $($script:asked.DiscSex) / chart '$($script:asked.ChartName)' $($script:asked.ChartBirth) $($script:asked.ChartSex) - birth differs: $($script:asked.BirthDiffers), sex differs: $($script:asked.SexDiffers)"
+      Check "  brought in: $($free.Count) exam(s), $want image(s)" ($r.Ok -and $r.Imported -eq $free.Count -and $r.Images -eq $want -and $r.Failed -eq 0) "$($r.Code) imported=$($r.Imported) images=$($r.Images) failed=$($r.Failed) dropped=$($r.Dropped) | $($r.Errors -join ' | ')"
+      if ($r.Undrawn.Count) { "  images the EMR could not draw: $($r.Undrawn -join ', ')" } else { '  the EMR could draw every image' }
+      [void]$form.Search()
+      $new = @(Brought | Where-Object { $ids -notcontains [int]$_['id'] })
+      Check '  the EMR lists them for this patient' ($new.Count -eq $r.Imported) "$($new.Count) new in the list"
+      foreach ($e in $new) { $left += "import $($e['id']), $($e['modality']) $($e['study_date']) '$($e['description'])', $($e['image_count']) image(s)" }
+      $form.CheckSource(); $form.FillImportGrid()
+      Check '  afterwards every one of them reads as already here' (@($form.ImportGrid.Rows | Where-Object { $_.Tag.State -eq '' -and $_.Tag.PatientKey -eq $src.Studies[0].PatientKey }).Count -eq 0)
+    }
+  }
 
   'at the end'
   $after = @{}; Get-ChildItem -LiteralPath $disc -Recurse -File | ForEach-Object { $after[$_.FullName] = Sha $_.FullName }
@@ -141,5 +193,5 @@ try {
   for ($i = 0; $i -lt 10 -and (Test-Path -LiteralPath $work); $i++) { try { [IO.Directory]::Delete($work, $true) } catch { Start-Sleep -Milliseconds 300 } }
 }
 Check 'nothing of the test is left on this PC' (-not (Test-Path -LiteralPath $work))
-if ($left) { "LEFT IN THE TEST EMR (chart $Chart): $left - take it out in the EMR, or reset the test installation." } else { "Nothing was brought into the test EMR." }
+if ($left.Count) { "LEFT IN THE TEST EMR (chart $Chart) - take them out in the EMR, or reset the test installation:"; $left | ForEach-Object { "  $_" } } else { 'Nothing was brought into the test EMR.' }
 if ($script:res -contains $false) { "SOME FAILED $($script:res.Count)"; exit 1 } else { "ALL PASS $($script:res.Count)" }
