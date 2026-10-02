@@ -16,3 +16,7 @@ logs/
 
 # cd-export: the EMR address of this machine
 cd-export.ini
+
+# Bethesda CD: what build.ps1 makes, and the settings of this machine
+bethesda-cd/build/
+Bethesda-CD.ini

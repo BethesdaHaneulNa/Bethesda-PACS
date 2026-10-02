@@ -11,7 +11,7 @@
 #   DICOMDIR      the standard index, made by the image server
 #   IMAGES\IM0…   the original DICOM files, as the image server holds them
 #   README.TXT    written here: whose images, which exams, how to read the disc
-#   VOIR.EXE      the clinic's small viewer, built here from viewer\*.cs (when they are there)
+#   VOIR.EXE      the clinic's small viewer, built here from bethesda-cd\src (when it is there)
 # Nothing is installed and no system setting is changed: burning uses Windows' own
 # burning component (IMAPI2), the window is Windows' own (WinForms).
 
@@ -265,12 +265,13 @@ function Write-DiscReadme {
 # A hospital reads the disc with its own imaging software; a patient has none. So every
 # disc carries the clinic's own small viewer, VOIR.EXE: a look at the images, nothing
 # more (EMR wiki, reference/cd-mini-viewer-design.md). Its source is beside this program
-# (viewer\*.cs) and it is built on the spot, by the C# compiler that ships with Windows -
+# (bethesda-cd\src\viewer) and it is built on the spot, by the C# compiler that ships with Windows -
 # no program file is kept in the repository and nothing is installed.
 function Get-ViewerSource([string]$ProgramDir) {
-  $dir = Join-Path $ProgramDir 'viewer'
-  if (-not (Test-Path -LiteralPath $dir -PathType Container)) { return , @() }
-  return , @(Get-ChildItem -LiteralPath $dir -Filter '*.cs' -File | Sort-Object Name | ForEach-Object { $_.FullName })
+  # (the viewer's source now lives with Bethesda CD, the program that replaces this one)
+  $dir = Join-Path $ProgramDir 'bethesda-cd\src'
+  if (-not (Test-Path -LiteralPath (Join-Path $dir 'viewer') -PathType Container)) { return , @() }
+  return , @('shared', 'viewer' | ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $dir $_) -Filter '*.cs' -File | Sort-Object Name | ForEach-Object { $_.FullName } })
 }
 # Builds VOIR.EXE into the disc folder. Returns @{ ok; bytes; error }.
 function Add-DiscViewer {

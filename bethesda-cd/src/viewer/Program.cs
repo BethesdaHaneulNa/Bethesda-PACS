@@ -6,9 +6,8 @@ using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
 
-[assembly: AssemblyTitle("Bethesda - visionneuse d'images")]
-[assembly: AssemblyProduct("Bethesda PACS")]
-[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyTitle("VOIR - Bethesda CD viewer")]
+[assembly: AssemblyDescription("Shows the images of the disc it is on. For reference - not for diagnosis.")]
 
 namespace Bethesda.Viewer {
   static class Program {

@@ -41,12 +41,12 @@ namespace Bethesda.Viewer {
           "Liste de gauche : les examens et leurs séries. Cliquez sur une série.\n\n" +
           "Molette : image précédente / suivante\nBouton gauche + glisser : luminosité (haut / bas) et contraste (gauche / droite) — aussi avec les deux curseurs en bas, sur les images en gris comme en couleur\nCtrl + molette : zoom\nBouton droit + glisser : déplacer l'image\nDouble-clic : ajuster à la fenêtre\n\n" +
           "Touches : ← → image   ↑ ↓ série   I inverser   R réinitialiser\n\n" +
-          "Cette visionneuse ne s'installe pas et ne laisse rien sur cet ordinateur.",
+          "Cette visionneuse ne s'installe pas et ne laisse rien sur cet ordinateur.\n\n" + Product.Name + " " + Product.Version,
           "Image viewer — for looking at the images of this disc.\nIt is not meant for diagnosis: for a diagnosis, open the disc with medical imaging software (file DICOMDIR).\n\n" +
           "List on the left: the exams and their series. Click a series.\n\n" +
           "Wheel: previous / next image\nLeft button + drag: brightness (up / down) and contrast (left / right) - also with the two sliders at the bottom, on grey and on colour images\nCtrl + wheel: zoom\nRight button + drag: move the image\nDouble-click: fit to the window\n\n" +
           "Keys: ← → image   ↑ ↓ series   I invert   R reset\n\n" +
-          "This viewer installs nothing and leaves nothing on this computer." } },
+          "This viewer installs nothing and leaves nothing on this computer.\n\n" + Product.Name + " " + Product.Version } },
     };
 
     public static string Get(string key) { string[] v; return T.TryGetValue(key, out v) ? v[Lang == "fr" ? 0 : 1] : key; }

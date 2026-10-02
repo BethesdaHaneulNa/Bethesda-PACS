@@ -256,63 +256,27 @@ locked away, and never lend it or use it for anything else.
 The EMR status screen warns when the disk is missing, full, or the backup has not
 succeeded recently. Details: the EMR wiki, `modules/pacs.md` 6.2.
 
-## Copying a patient's images to a CD: `cd-export.bat` (Windows)
+## Copying a patient's images to a CD: Bethesda CD (Windows)
 
-Hospitals still ask for images on a CD. `cd-export.bat` is a small separate program for
-that - double-click it on any PC that reaches the EMR (French; `-Lang ko`, `-Lang en`):
+Hospitals still ask for images on a CD. **Bethesda CD** (`bethesda-cd\`) is a small separate
+program for that: sign in with an EMR account, type the patient's chart number, tick the
+exams, burn - or save a disc image, or a folder on a USB stick. Every disc carries a small
+viewer, `VOIR.EXE`, for those who have no imaging software. It talks to the EMR only (never
+to Orthanc), installs nothing and changes no system setting. Everything about it - what it
+does, what it needs, how the viewer works, how it is tested - is in
+[`bethesda-cd\README.md`](bethesda-cd/README.md).
 
-1. **Sign in** with an EMR account (Consultation or Payment). The first time it asks for
-   the EMR's address (`http://<server>:9080`) and keeps it in `cd-export.ini` beside the
-   program. No password and no token is ever written to disk.
-2. Type the patient's **chart number**. The patient's name and date of birth are shown,
-   to be checked, and the list of imaging exams with the number of images and the size.
-3. **Tick** the exams. The window says how much they take and, when a blank disc is in
-   the drive, whether they fit (it sees a disc put in by itself).
-4. **Graver ce CD…** asks "burn N exams of this patient to the disc in drive X?", burns,
-   checks the disc and opens the tray. **Enregistrer en fichier ISO…** and **Enregistrer
-   dans un dossier…** do the same to a disc image or to a new folder (a USB stick) - they
-   work on a PC without a burner. Every file written is read back and compared.
+```powershell
+.\bethesda-cd\build.ps1        # -> bethesda-cd\build\Bethesda-CD.exe (VOIR.EXE inside it)
+```
 
-What is written is a standard DICOM disc - `DICOMDIR` and the original files under
-`IMAGES\`, made by Orthanc itself (`/tools/create-media-extended`) - plus `README.TXT`
-(whose images, which exams, how to read the disc; French then English) and `VOIR.EXE` (below).
-No JPEG copies.
+The folder `bethesda-cd\` stands on its own (source, build script, icon script, tests, its own
+README, CHANGELOG and LICENSE): it leans on nothing else in this repository, and its only tie
+to the EMR is the three HTTP calls its README lists (EMR 1.5.0 or later).
 
-- The program talks to **the EMR only**, never to Orthanc: the Orthanc password is not in
-  it, and it runs from a reception PC as well as from the server. The EMR checks the
-  account's rights, refuses exams that must not leave (cancelled, or carrying an identity
-  warning) and writes **one line in its change log per copy** - no line, no copy.
-- Only a **blank** disc is written. A disc that already holds something is never used and
-  never erased. The disc is closed: nothing can be added to it later. It is written at the
-  slowest speed the drive offers and checked twice - by the drive, then file by file. A small
-  exam takes about three minutes, most of it the check.
-- Nothing is installed and no system setting is changed: burning is Windows' own (IMAPI2).
-  The images fetched stay under `%TEMP%\BethesdaCD` while the copy is made and are removed
-  afterwards (and at the next start, if the program was killed).
-- A folder or an ISO saved by the program holds a patient's images, unencrypted: delete it
-  when it is no longer needed.
-
-**A small viewer on every disc: `VOIR.EXE`.** A hospital reads the disc with its own imaging
-software; a patient or a small practice has none. So the disc carries the clinic's own viewer -
-about 50 KB, started by a double-click, nothing installed and nothing left on the PC that runs
-it: the exams and series of the disc on the left, the image on the right, window (left drag),
-zoom (Ctrl + wheel), pan (right drag), invert, previous / next. Always in sight: "for
-reference - not for diagnosis". Its source is `viewer\*.cs`; the program builds it into the
-disc with the C# compiler that ships with Windows - no program file is kept in this repository.
-It shows uncompressed images and JPEG: lossless JPEG - what the clinic's ultrasound machine
-sends (GE LOGIQ P10: lossless, 8-bit RGB) - is decoded by the viewer itself, exactly; lossy
-8-bit JPEG by the decoder that is part of Windows. RLE is decoded by the viewer too. A file of
-several frames is stepped through with the wheel; there is no playback (no echocardiography at
-the clinic). What the viewer does not open (JPEG 2000, JPEG-LS, 12-bit lossy JPEG, ...) does not
-reach the disc compressed: when a chosen exam holds such an image, the EMR asks the image server
-to unpack the whole bundle (lossless; the copy is larger - about three times for the clinic's
-ultrasound images if they are in the same copy) and the closing message says so.
-(Weasis on the disc was tried and dropped: 139 MB on every disc, about 95 MB left on the PC
-that runs it.)
-
-Files: `cd-export.bat` (start), `cd-export.ps1`, `cd-export-ui.ps1` (the window),
-`cd-export-common.ps1` (the work), `viewer\*.cs` (the viewer's source). Needs an EMR that has `GET /api/pacs/export/patient`
-and `/bundle` (EMR after 1.5.0). Details: the EMR wiki, `modules/pacs.md` 2.4.4.
+`cd-export.bat` (with `cd-export*.ps1`) is the same program as PowerShell scripts, from before
+it was built as an .exe. It stays for one release as the way back and builds the same viewer
+from `bethesda-cd\src`; it will then be removed.
 
 ## Test tools (optional)
 
