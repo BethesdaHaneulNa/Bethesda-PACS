@@ -609,7 +609,7 @@ namespace Bethesda.Cd {
           DiscName = sel[0].PatientShown, DiscId = sel[0].PatientId, DiscBirth = DateShown(sel[0].BirthDate) == "—" ? "" : DateShown(sel[0].BirthDate), DiscSex = SexShown(sel[0].Sex),
           ChartName = NameOf(p), ChartNo = J.Str(p, "chart_no"), ChartBirth = J.Str(p, "date_of_birth"), ChartSex = SexShown(J.Str(p, "gender")),
           BirthDiffers = ImportDisc.BirthDiffers(sel[0].BirthDate, J.Str(p, "date_of_birth")), SexDiffers = ImportDisc.SexDiffers(sel[0].Sex, J.Str(p, "gender")) };
-        foreach (ImportStudy st in sel) info.Exams.Add((st.Institution == "" ? "" : st.Institution + " — ") + ExamShown(st) + " — " + st.Files.Count + " · " + DiscFolder.FormatSize(st.Bytes, unit));
+        foreach (ImportStudy st in sel) info.Exams.Add((st.Institution == "" ? "" : st.Institution + " — ") + ExamShown(st) + " — " + Texts.Get("cfImages", st.Files.Count) + " · " + DiscFolder.FormatSize(st.Bytes, unit));
         SetStatus("", 0);
         if (!Ask.SamePatient(info)) { res.Code = "CANCELLED_BY_USER"; return res; }
 

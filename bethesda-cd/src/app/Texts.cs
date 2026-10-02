@@ -160,6 +160,7 @@ namespace Bethesda.Cd {
       { "cfDiffer", new[] { "✘ différent", "✘ 다름", "✘ different" } },
       { "cfNameNote", new[] { "Le nom n'est pas comparé : chaque hôpital l'écrit à sa façon.", "이름은 병원마다 적는 법이 달라 비교하지 않습니다.", "The name is not compared: every hospital writes it its own way." } },
       { "cfExams", new[] { "À importer :", "들여올 것:", "To bring in:" } },
+      { "cfImages", new[] { "{0} image(s)", "영상 {0}장", "{0} image(s)" } },
       { "cfMore", new[] { "… et {0} autre(s)", "… 그 밖에 {0}건", "… and {0} more" } },
       { "cfCheck", new[] { "Je confirme que ces images sont celles de ce patient.", "이 영상이 이 환자의 것이 맞습니다.", "I confirm that these images are this patient's." } },
       { "cfCheckDiffer", new[] { "La date de naissance ou le sexe sont différents. Je confirme malgré tout que ces images sont celles de ce patient.", "생년월일 또는 성별이 다릅니다. 그래도 이 환자의 영상이 맞습니다.", "The date of birth or the sex differ. I confirm all the same that these images are this patient's." } },
