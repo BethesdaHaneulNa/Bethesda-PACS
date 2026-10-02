@@ -9,7 +9,8 @@
 #
 # Two programs are built:
 #   VIEWER.EXE        the small viewer that goes on every disc  (src\viewer + src\shared)
-#   Bethesda-CD.exe   the program the clinic runs               (src\app + src\shared),
+#   Bethesda-CD.exe   the program the clinic runs               (src\app + src\shared, and the
+#                     viewer's reading of a disc - src\viewer\Dicom.cs, Disc.cs - for "bring in"),
 #                     carrying VIEWER.EXE inside itself as a resource - so every disc
 #                     it makes gets the very same viewer file.
 param([string]$Out = (Join-Path $PSScriptRoot 'build'), [ValidateSet('A', 'B', 'C')][string]$Icon = 'A', [string]$IconFile = '')
@@ -38,7 +39,7 @@ Compile 'The viewer' (@('/target:winexe', "/out:$viewer", "/win32icon:$ico", '/r
 $exe = Join-Path $Out 'Bethesda-CD.exe'
 Compile 'Bethesda CD' (@('/target:winexe', "/out:$exe", "/win32icon:$ico", "/resource:$viewer,VIEWER.EXE",
     '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.IO.Compression.dll', '/r:System.IO.Compression.FileSystem.dll',
-    '/r:System.Web.Extensions.dll', '/r:Microsoft.CSharp.dll') + (Sources 'shared', 'app'))
+    '/r:System.Web.Extensions.dll', '/r:Microsoft.CSharp.dll') + (Sources 'shared', 'app') + @((Join-Path $src 'viewer\Dicom.cs'), (Join-Path $src 'viewer\Disc.cs')))
 
 $v = [Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
 "built: $exe"
