@@ -579,6 +579,10 @@ namespace Bethesda.Cd {
       List<ImportStudy> sel = ChosenStudies();
       if (sel.Count == 0 || Busy || ImportInfo == null || !Emr.CanImport) { res.Code = "NOTHING"; return res; }
       Dictionary<string, object> p = J.Dict(ImportInfo, "patient"); string unit = Texts.Unit;
+      // the image server is not there (or the EMR could not say what it knows of the disc): no question
+      // is asked of the person for something that cannot be done - the button is off for the same reason
+      string why = J.Str(ImportInfo, "server") != "" ? J.Str(ImportInfo, "server") : ImportError != "" ? ImportError : CheckError;
+      if (why != "") { Ask.Message(Texts.Error(why, ""), "error"); res.Code = why; return res; }
       foreach (ImportStudy st in sel) if (st.PatientKey != sel[0].PatientKey) { Ask.Message(Texts.Get("impOnePatient"), "warn"); res.Code = "SEVERAL_PATIENTS"; return res; }
       long bytes = 0; foreach (ImportStudy st in sel) bytes += st.Bytes;
       long free = Limit("free_bytes"), spare = Math.Max(0, Limit("spare_bytes")), warn = Limit("warn_bytes");

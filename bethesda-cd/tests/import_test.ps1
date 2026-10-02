@@ -295,6 +295,8 @@ try {
   $S.warn = 2GB; $script:answer = $true
   $S.server = 'UNREACHABLE'; Reset; [void]$form.Search(); Tick $A
   Check '  the image server does not answer: said, the button is off, the EMR is not asked about the exams' (-not $form.ImportButton.Enabled -and $form.ImportSelection.ForeColor.ToArgb() -eq [Drawing.Color]::Firebrick.ToArgb() -and (Calls '*check') -eq 0) $form.ImportSelection.Text
+  $script:said.Clear(); $r = $form.Import()
+  Check '  ... and asked anyway: said, no question about the patient, nothing sent' (-not $r.Ok -and $r.Code -eq 'UNREACHABLE' -and $null -eq $script:asked -and $script:said.Count -eq 1 -and (Calls '*begin') -eq 0) $script:said[0]
   $S.server = ''
 
   '12. a disc of two patients, a folder without images'
