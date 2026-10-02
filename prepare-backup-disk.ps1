@@ -12,11 +12,18 @@ param(
 )
 $ErrorActionPreference = 'Continue'
 . (Join-Path $PSScriptRoot 'image-backup-common.ps1')
+. (Join-Path $PSScriptRoot 'image-storage-common.ps1')
 
 if (-not (Test-Path $Target)) { Write-Host "No such drive or folder: $Target"; exit 1 }
 $root = (Resolve-Path $Target).Path
 if ($root -match '^[A-Za-z]:\\?$' -and $root.Substring(0, 1).ToUpper() -eq $env:SystemDrive.Substring(0, 1).ToUpper()) {
   Write-Host "$root is the system disk. Use an external disk."; exit 1
+}
+# Nor the disk the images themselves are on (the image store may be on a drive of its own:
+# ORTHANC_STORAGE_PATH in .env). Two partitions of one disk are one disk.
+$store = Get-ImageStoragePath $PSScriptRoot (Join-Path $PSScriptRoot '.env')
+if ((Test-SamePhysicalDisk $root $store) -eq $true) {
+  Write-Host "$root is on the same physical disk as the image store ($store): a backup there is lost together with the images. Use another disk."; exit 1
 }
 if (Test-Path (Join-Path $root $MarkerName)) { Write-Host "$root is already a PACS backup disk - nothing to do."; exit 0 }
 

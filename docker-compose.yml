@@ -9,6 +9,25 @@ services:
     image: orthancteam/orthanc:26.6.1
     container_name: bethesda-pacs
     restart: unless-stopped
+    # Before Orthanc's own start-up: is the image store really there? It is recognised by
+    # its marker file (setup and move-image-storage.ps1 write it) or by an existing image
+    # index. When the store's drive is missing or has another letter, Docker Desktop makes
+    # an EMPTY folder of that name; Orthanc started on it would look healthy, hold nothing
+    # and take in what devices send - the real images would seem gone. So it does not start:
+    # this container keeps restarting and says why (docker logs bethesda-pacs) until the
+    # store is back. Orthanc itself is started unchanged, by its own entrypoint.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ ! -f /var/lib/orthanc/db/BETHESDA-PACS-STORAGE.id ] && [ ! -f /var/lib/orthanc/db/index ]; then
+          echo 'BETHESDA PACS: the image store is not there (no BETHESDA-PACS-STORAGE.id and no image index in the storage folder).' >&2
+          echo 'Is the disk of ORTHANC_STORAGE_PATH connected, under the same drive letter? The image server is NOT started on an empty folder.' >&2
+          echo 'Connect the disk and run start.bat again. A first installation is made with start.bat (setup), which prepares the folder.' >&2
+          sleep 30
+          exit 1
+        fi
+        exec /docker-entrypoint.sh /tmp/orthanc.json
     ports:
       # Web UI / REST / DICOMweb on this machine only (P-9): staff see images
       # through the EMR, which reaches this port via host.docker.internal and adds
@@ -50,7 +69,10 @@ services:
       ORTHANC__STONE_WEB_VIEWER__SHOW_INFO_PANEL_AT_STARTUP: "Never"
       ORTHANC_EXPLORER_2_ENABLED: "true"
     volumes:
-      - ./storage:/var/lib/orthanc/db          # DICOM images + index (persist)
+      # DICOM images + index (persist). Where: ORTHANC_STORAGE_PATH in .env - a folder on
+      # another drive, e.g. D:/Bethesda-PACS-images (setup asks; move-image-storage.ps1 moves
+      # an existing store). Not set: ./storage in this folder, as it always was.
+      - ${ORTHANC_STORAGE_PATH:-./storage}:/var/lib/orthanc/db
       - ./worklists:/var/lib/orthanc/worklists # .wl worklist files written by the EMR bridge
     # Ask Orthanc's own REST API rather than trusting that the process is still
     # running. /system needs a login, so 401 is a perfectly good answer here: it
@@ -76,6 +98,7 @@ services:
       # No fallback: the EMR refuses the old published placeholder anyway.
       BRIDGE_TOKEN: "${BRIDGE_TOKEN:-}"
       WL_DIR: "/worklists"
+      STORAGE_DIR: "/storage"   # the image store, read-only: only to say how much room its disk has left
       POLL_SECONDS: "15"
       # To see which scheduled studies have arrived, so finished patients leave
       # the device worklist. Same login as the web viewer (Orthanc has one user).
@@ -84,6 +107,7 @@ services:
       ORTHANC_PASSWORD: "${ORTHANC_PASSWORD:-}"
     volumes:
       - ./worklists:/worklists
+      - ${ORTHANC_STORAGE_PATH:-./storage}:/storage:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     # The bridge has no port to knock on, so it leaves timestamps instead:
