@@ -175,7 +175,8 @@ src\viewer\     the viewer:   Program · MainForm · ImagePanel · Disc · Dicom
 src\shared\     Version.cs
 icon\           make-icon.ps1
 install.ps1     install.bat - the program and a desktop shortcut on a PC
-tests\          viewer_test.ps1 · disc_test.ps1 · import_test.ps1 · app_test.ps1
+tests\          viewer_test.ps1 · disc_test.ps1 · import_test.ps1 · app_test.ps1 · import_real_test.ps1
+                (fake_dicom.ps1: the made-up DICOM files the two import tests write)
 ```
 
 The program is not signed. Built on the PC that runs it, or brought on a USB stick, Windows
@@ -189,6 +190,7 @@ internet" mark and SmartScreen asks once ("More info" -> "Run anyway").
 .\tests\disc_test.ps1 -Mount  # needs nothing: the viewer, AUTORUN.INF and README.TXT on a disc folder, a folder copy, a disc image
 .\tests\import_test.ps1       # needs nothing: a made-up disc and a stand-in for the EMR on this PC - bringing in, start to end
 .\tests\app_test.ps1 -Emr http://127.0.0.1:9188 -Login someone -Chart 26-00001 -ExamIds 55,56 -Base D:\empty\folder
+.\tests\import_real_test.ps1 -Emr http://127.0.0.1:9188 -Login someone -Chart 26-00001
 ```
 
 `viewer_test.ps1` writes made-up pictures as DICOM in every form the viewer reads (RLE and
@@ -208,6 +210,11 @@ test EMR.
 one the clinic works on): sign-in, the list, a copy to a folder, a disc image, the refusals.
 It burns nothing. The test account's password is taken from the environment variable
 `BETHESDA_CD_TEST_PASSWORD`.
+`import_real_test.ps1` brings a made-up exam of three small images into a chart of a **test**
+EMR that has its image server (same password variable): the exam really goes in and the EMR
+lists it, the same exam is refused a second time, a second exam is stopped half-way and the
+EMR is seen to have taken it back. It leaves that one made-up exam in the test EMR and says
+which; on the PC it leaves nothing.
 
 ## License
 
