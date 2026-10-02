@@ -7,7 +7,7 @@ info via DICOM Modality Worklist.
 
 EMR (orders) --HTTP--> this bridge --.wl files--> Orthanc worklists --MWL--> device
 """
-import os, re, time
+import os, re, shutil, time
 import requests
 from pydicom.dataset import Dataset, FileDataset
 from pydicom.uid import generate_uid, ExplicitVRLittleEndian
@@ -97,10 +97,23 @@ def report(ok, synced=0, failed=0, error=""):
             "error": scrub(error)[:500],
             "poll_seconds": POLL,
             "arrivals_error": scrub(arrivals_error)[:300],
+            # Room on the disk the image server stores on: the worklist folder this bridge
+            # writes to is on that disk (./worklists beside ./storage). The EMR refuses to
+            # bring a disc's images in when they would fill it.
+            "storage_free_bytes": storage_room()[0],
+            "storage_total_bytes": storage_room()[1],
         })
     except Exception:
         # The EMR being down is already its own alarm; do not add noise here.
         pass
+
+
+def storage_room():
+    try:
+        u = shutil.disk_usage(WL_DIR)
+        return int(u.free), int(u.total)
+    except Exception:
+        return 0, 0
 
 
 def safe(name):
