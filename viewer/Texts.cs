@@ -23,6 +23,7 @@ namespace Bethesda.Viewer {
       { "frame",      new[] { "fichier à plusieurs images : {0} / {1} (molette)",                 "a file of several frames: {0} / {1} (wheel)" } },
       { "window",     new[] { "Fenêtre C {0}  L {1}",                                             "Window C {0}  W {1}" } },
       { "zoom",       new[] { "zoom {0} %",                                                       "zoom {0} %" } },
+      { "reading",    new[] { "Lecture de l'image…",                                              "Reading the image…" } },
       { "empty",      new[] { "Aucune image DICOM dans ce dossier.",                              "No DICOM image in this folder." } },
       { "choose",     new[] { "Choisissez le dossier (ou le disque) qui contient les images",     "Choose the folder (or the disc) that holds the images" } },
       { "pick",       new[] { "Choisissez une série dans la liste de gauche.",                    "Choose a series in the list on the left." } },

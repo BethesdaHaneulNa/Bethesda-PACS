@@ -87,6 +87,10 @@ namespace Bethesda.Viewer {
     public void ShowImage(int i) {
       if (series == null || series.Images.Count == 0) return;
       i = Math.Max(0, Math.Min(series.Images.Count - 1, i));
+      // A large film takes seconds to come off a CD (8 s for 14 MB, measured): say so while
+      // it is read - in the line under the picture, and in the picture area when it is empty.
+      where.Text = Texts.Get("reading"); where.Refresh();
+      if (picture == null) { panel.Message = Texts.Get("reading"); panel.Refresh(); }
       if (picture != null) picture.Dispose();
       index = i; frame = 0; picture = Picture.Open(series.Images[i].File); inverted = false;
       if (picture.Problem == "") {
