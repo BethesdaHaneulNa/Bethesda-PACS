@@ -37,6 +37,22 @@ the disc           DICOMDIR      the standard index            \  made by the cl
   writes one line in its change log for every copy - no line, no copy.
 - A disc burner is optional: without one, "save as ISO file" and "save to a folder" still work.
 
+## Putting it on a PC
+
+On the server PC the PACS setup makes a "Bethesda CD" shortcut on the desktop by itself. On
+any other PC (a reception desk - no Docker needed there) copy the folder with
+`Bethesda-CD.exe`, `install.bat` and `install.ps1` to it, on a USB stick for instance, and
+double-click **`install.bat`**: it copies the program to this user's programs folder, asks for
+the address of the EMR once, and puts **Bethesda CD** on the desktop.
+
+```powershell
+.\install.ps1 -EmrUrl http://192.168.1.10:9080     # the same, without the question
+.\install.ps1 -Here                                # no copy: a shortcut to the program where it is
+```
+
+It copies one file, writes `Bethesda-CD.ini` when there is none, and makes or corrects one
+shortcut - no registry key, no scheduled task. To remove it: delete the shortcut and the folder.
+
 ## Using it
 
 Double-click `Bethesda-CD.exe`. The first time, type the address of the EMR
@@ -83,7 +99,8 @@ server unpack that copy, losslessly, and the program says so. There is no playba
 ```
 
 Only what Windows already has is used: the C# compiler of the .NET Framework (`csc.exe`, C# 5).
-Nothing is installed or downloaded; the icon is drawn by `icon\make-icon.ps1`. The viewer is
+Nothing is installed or downloaded. The icon is `icon\Bethesda-CD.ico` when that file is there (or
+`-IconFile x.ico`); without one it is drawn on the spot by `icon\make-icon.ps1`. The viewer is
 built first and carried inside `Bethesda-CD.exe` as a resource, so every disc gets the very
 same `VOIR.EXE`. The version is written in one place, `src\shared\Version.cs`.
 
@@ -92,6 +109,7 @@ src\app\        the program:  Program · MainForm · Texts · Emr · DiscFolder 
 src\viewer\     the viewer:   Program · MainForm · ImagePanel · Disc · Dicom · Picture · Jpeg · Rle · Texts
 src\shared\     Version.cs
 icon\           make-icon.ps1
+install.ps1     install.bat - the program and a desktop shortcut on a PC
 tests\          viewer_test.ps1 · app_test.ps1
 ```
 

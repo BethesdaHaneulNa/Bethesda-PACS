@@ -2,14 +2,17 @@
 # (csc.exe, C# 5). Nothing is installed, nothing is downloaded.
 #
 #   .\build.ps1                  -> build\Bethesda-CD.exe   (the viewer VOIR.EXE is inside it)
-#   .\build.ps1 -Icon B          another icon (icon\make-icon.ps1)
+#   .\build.ps1 -IconFile x.ico  with a given icon file
+#
+# The icon: -IconFile when given; else icon\Bethesda-CD.ico when that file is there (the
+# chosen one, once it exists); else one drawn on the spot by icon\make-icon.ps1 (-Icon A, B, C).
 #
 # Two programs are built:
 #   VOIR.EXE          the small viewer that goes on every disc  (src\viewer + src\shared)
 #   Bethesda-CD.exe   the program the clinic runs               (src\app + src\shared),
 #                     carrying VOIR.EXE inside itself as a resource - so every disc it
 #                     makes gets the very same viewer file.
-param([string]$Out = (Join-Path $PSScriptRoot 'build'), [ValidateSet('A', 'B', 'C')][string]$Icon = 'A')
+param([string]$Out = (Join-Path $PSScriptRoot 'build'), [ValidateSet('A', 'B', 'C')][string]$Icon = 'A', [string]$IconFile = '')
 $ErrorActionPreference = 'Stop'
 $csc = Join-Path ([Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) 'csc.exe'
 if (-not (Test-Path -LiteralPath $csc)) { throw "The C# compiler of the .NET Framework was not found: $csc" }
@@ -23,7 +26,11 @@ function Compile([string]$What, [string[]]$Arguments) {
 }
 
 $ico = Join-Path $Out 'Bethesda-CD.ico'
-& (Join-Path $PSScriptRoot 'icon\make-icon.ps1') -Variant $Icon -Out $ico | Out-Null
+if (-not $IconFile) { $chosen = Join-Path $PSScriptRoot 'icon\Bethesda-CD.ico'; if (Test-Path -LiteralPath $chosen) { $IconFile = $chosen } }
+if ($IconFile) {
+  if (-not (Test-Path -LiteralPath $IconFile)) { throw "The icon file was not found: $IconFile" }
+  Copy-Item -LiteralPath $IconFile -Destination $ico -Force
+} else { & (Join-Path $PSScriptRoot 'icon\make-icon.ps1') -Variant $Icon -Out $ico | Out-Null }
 
 $voir = Join-Path $Out 'VOIR.EXE'
 Compile 'The viewer' (@('/target:winexe', "/out:$voir", "/win32icon:$ico", '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll') + (Sources 'shared', 'viewer'))

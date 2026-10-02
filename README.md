@@ -274,6 +274,12 @@ The folder `bethesda-cd\` stands on its own (source, build script, icon script, 
 README, CHANGELOG and LICENSE): it leans on nothing else in this repository, and its only tie
 to the EMR is the three HTTP calls its README lists (EMR 1.5.0 or later).
 
+`setup.ps1` ends by putting two shortcuts on the server PC's desktop (`desktop-shortcuts.ps1`,
+which can be run again by itself): **Bethesda PACS** - the image server's own page, for the
+administrator - and **Bethesda CD**. Only files on the desktop are made; one that is there
+already is corrected, not doubled. On a reception PC, `bethesda-cd\install.bat` puts the CD
+program and its shortcut there.
+
 `cd-export.bat` (with `cd-export*.ps1`) is the same program as PowerShell scripts, from before
 it was built as an .exe. It stays for one release as the way back and builds the same viewer
 from `bethesda-cd\src`; it will then be removed.
