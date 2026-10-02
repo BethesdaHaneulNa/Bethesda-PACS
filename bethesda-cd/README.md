@@ -176,7 +176,8 @@ src\shared\     Version.cs
 icon\           make-icon.ps1
 install.ps1     install.bat - the program and a desktop shortcut on a PC
 tests\          viewer_test.ps1 · disc_test.ps1 · import_test.ps1 · app_test.ps1 · import_real_test.ps1
-                (fake_dicom.ps1: the made-up DICOM files the two import tests write)
+                (fake_dicom.ps1: the made-up DICOM files the two import tests write;
+                 quiet_window.ps1: the tests' windows are shown off the screen)
 ```
 
 The program is not signed. Built on the PC that runs it, or brought on a USB stick, Windows
@@ -214,7 +215,12 @@ It burns nothing. The test account's password is taken from the environment vari
 EMR that has its image server (same password variable): the exam really goes in and the EMR
 lists it, the same exam is refused a second time, a second exam is stopped half-way and the
 EMR is seen to have taken it back. It leaves that one made-up exam in the test EMR and says
-which; on the PC it leaves nothing.
+which; on the PC it leaves nothing. `-RealDisc D:\a\disc` also brings in the exams of a disc
+folder the test did not make (they stay in the test EMR too); `-OverLimit` sends one file
+larger than the EMR allows, to see the refusal.
+
+The tests that drive a window show it far off the screen, out of the taskbar and without
+taking the keyboard: someone may be working at the PC.
 
 ## License
 
