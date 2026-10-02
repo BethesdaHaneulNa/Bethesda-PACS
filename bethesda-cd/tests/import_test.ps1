@@ -18,6 +18,7 @@ if (-not $Exe) { $Exe = Join-Path $PSScriptRoot '..\build\Bethesda-CD.exe' }
 $Exe = (Resolve-Path -LiteralPath $Exe).Path
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 [void][Reflection.Assembly]::LoadFrom($Exe)
+. (Join-Path $PSScriptRoot 'quiet_window.ps1')
 
 # ── made-up DICOM files (written by the test; the program only reads them) ───────────────
 . (Join-Path $PSScriptRoot 'fake_dicom.ps1')
@@ -147,7 +148,7 @@ function Body([string]$path) { $b = @($S.bodies | Where-Object { $_.path -eq $pa
 $ini = Join-Path $work 'test.ini'
 $form = $null
 try {
-  $form = New-Object Bethesda.Cd.MainForm([Bethesda.Cd.Config]::Read($ini)); $form.Show(); [Windows.Forms.Application]::DoEvents()
+  $form = New-Object Bethesda.Cd.MainForm([Bethesda.Cd.Config]::Read($ini)); Show-Quietly $form
   function Shot([string]$name) {
     if (-not $Shots) { return }
     [Windows.Forms.Application]::DoEvents()
@@ -228,7 +229,7 @@ try {
 
   '7. the real question window'
   $info = New-Object Bethesda.Cd.ConfirmInfo; $info.DiscName = 'X'; $info.ChartName = 'Y'; $info.DiscBirth = '1985-04-12'; $info.ChartBirth = '1990-01-01'; $info.BirthDiffers = $true; $info.Exams.Add('HJRA - CT')
-  $dlg = New-Object Bethesda.Cd.ImportConfirmForm($info); $dlg.Show(); [Windows.Forms.Application]::DoEvents()
+  $dlg = New-Object Bethesda.Cd.ImportConfirmForm($info); Show-Quietly $dlg
   $off = -not $dlg.Go.Enabled; $red = $dlg.Sure.ForeColor.ToArgb() -eq [Drawing.Color]::Firebrick.ToArgb(); $dlg.Sure.Checked = $true; [Windows.Forms.Application]::DoEvents()
   Check '  its button is off until the box is ticked; with a difference the sentence is the "all the same" one, in red' ($off -and $dlg.Go.Enabled -and $red -and $dlg.Sure.Text -eq [Bethesda.Cd.Texts]::Get('cfCheckDiffer') -and $dlg.Sure.Text -ne [Bethesda.Cd.Texts]::Get('cfCheck')) $dlg.Sure.Text
   if ($Shots) { $bmp = New-Object Drawing.Bitmap($dlg.Width, $dlg.Height); $dlg.DrawToBitmap($bmp, (New-Object Drawing.Rectangle(0, 0, $dlg.Width, $dlg.Height))); $bmp.Save((Join-Path $Shots "bethesda-cd-import-$Lang-confirm.png"), [Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose() }

@@ -568,9 +568,21 @@ namespace Bethesda.Cd {
     static bool WorthAnotherTry(string code) { return code == "BROKEN" || code == "NO_ANSWER" || code == "UNREACHABLE" || code == "HTTP_502" || code == "HTTP_503" || code == "HTTP_504"; }
     // A pause in which the window goes on answering (the "Annuler" button too).
     void Pause(int ms) { DateTime until = DateTime.Now.AddMilliseconds(ms); while (DateTime.Now < until && !stopAsked) { Application.DoEvents(); Thread.Sleep(50); } }
+    // The EMR is asked on another thread while this one goes on answering Windows. Without it the
+    // window reads "not responding" during a long wait - the EMR closing a large exam takes minutes -
+    // and the "Annuler" button cannot be pressed. `tick` runs on the window's thread between two looks.
+    // Only used while the window is busy (its other buttons are off).
+    EmrAnswer Wait(Func<EmrAnswer> call, Action tick) {
+      EmrAnswer answer = null;
+      Thread t = new Thread(delegate() { try { answer = call(); } catch (Exception e) { answer = new EmrAnswer { Code = "BROKEN", Error = e.Message }; } });
+      t.IsBackground = true; t.Start();
+      while (!t.Join(30)) { if (tick != null) tick(); Application.DoEvents(); }
+      return answer;
+    }
+    EmrAnswer Wait(Func<EmrAnswer> call) { return Wait(call, null); }
     void GiveUp(string importId, string reason) {
       SetStatus(Texts.Get("impCancelling"), -1);
-      Emr.Post("/api/pacs/import/" + importId + "/cancel", new Dictionary<string, object> { { "reason", reason } }, 120);
+      Wait(delegate { return Emr.Post("/api/pacs/import/" + importId + "/cancel", new Dictionary<string, object> { { "reason", reason } }, 120); });
     }
 
     // The ticked exams of the disc go into the chart of the patient at the top of the window.
@@ -652,9 +664,10 @@ namespace Bethesda.Cd {
     string SendStudy(ImportStudy st, int index, int of, Dictionary<string, object> p, ConfirmInfo info, ImportResult res, out bool stopAll) {
       stopAll = false;
       SetStatus(Texts.Get("impSending", index, of, 0, st.Files.Count), 0);
-      EmrAnswer b = Emr.Post("/api/pacs/import/begin", new Dictionary<string, object> {
+      Dictionary<string, object> announce = new Dictionary<string, object> {
         { "patient_id", J.Long(p, "id") }, { "files", st.Files.Count }, { "bytes", st.Bytes }, { "source", ImportDisc.Origin(st) },
-        { "confirm", new Dictionary<string, object> { { "birth_differs", info.BirthDiffers }, { "sex_differs", info.SexDiffers } } } }, 120);
+        { "confirm", new Dictionary<string, object> { { "birth_differs", info.BirthDiffers }, { "sex_differs", info.SexDiffers } } } };
+      EmrAnswer b = Wait(delegate { return Emr.Post("/api/pacs/import/begin", announce, 120); });
       if (!b.Ok) {
         if (b.Code == "LOGIN") return "LOGIN";
         if (Texts.Has("s_" + b.Code)) { st.State = b.Code; st.ImportedAt = J.Str(b.Data, "imported_at"); }
@@ -669,7 +682,9 @@ namespace Bethesda.Cd {
           if (stopAsked) { GiveUp(id, "cancelled by the user"); return "CANCELLED"; }
           string words = Texts.Get(attempt == 1 ? "impSending" : "impRetry", index, of, n + 1, st.Files.Count); long before = sent;
           SetStatus(words, (int)(100 * before / total));
-          r = Emr.PutFile(path, f.Path, delegate(long done) { SetStatus(words, (int)(100 * (before + done) / total)); }, delegate { return stopAsked; }, 900);
+          long now = 0, drawn = 0;                         // the sending thread says how far it is; the window's thread draws it
+          r = Wait(delegate { return Emr.PutFile(path, f.Path, delegate(long done) { Interlocked.Exchange(ref now, done); }, delegate { return stopAsked; }, 900); },
+            delegate { long d = Interlocked.Read(ref now); if (d != drawn) { drawn = d; SetStatus(words, (int)(100 * (before + d) / total)); } });
           if (r.Ok || !WorthAnotherTry(r.Code) || attempt == 3) break;
           Pause(2000);                                     // a network hiccup, or the image server coming back: the same file again is safe
         }
@@ -685,7 +700,7 @@ namespace Bethesda.Cd {
       EmrAnswer fin = null;
       for (int attempt = 1; attempt <= 3; attempt++) {
         SetStatus(Texts.Get("impFinishing"), -1);
-        fin = Emr.Post("/api/pacs/import/" + id + "/finish", null, 600);
+        fin = Wait(delegate { return Emr.Post("/api/pacs/import/" + id + "/finish", null, 600); });
         if (fin.Ok || !(WorthAnotherTry(fin.Code) || fin.Code == "NOT_PAIRED" || fin.Code == "NOT_LOGGED") || attempt == 3) break;
         Pause(3000);
         if (stopAsked) break;

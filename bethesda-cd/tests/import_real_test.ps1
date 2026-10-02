@@ -26,6 +26,7 @@ if (-not $pw) { throw 'Set BETHESDA_CD_TEST_PASSWORD to the test account''s pass
 $Exe = (Resolve-Path -LiteralPath $Exe).Path
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 [void][Reflection.Assembly]::LoadFrom($Exe)
+. (Join-Path $PSScriptRoot 'quiet_window.ps1')
 . (Join-Path $PSScriptRoot 'fake_dicom.ps1')
 
 $script:res = @(); $script:said = New-Object Collections.Generic.List[string]; $script:answer = $true; $script:same = $true; $script:asked = $null
@@ -54,7 +55,7 @@ $sumA = 0; Get-ChildItem (Join-Path $disc 'DICOM\ST1') -File | ForEach-Object { 
 $ini = Join-Path $work 'test.ini'
 $form = $null; $left = ''
 try {
-  $form = New-Object Bethesda.Cd.MainForm([Bethesda.Cd.Config]::Read($ini)); $form.Show(); [Windows.Forms.Application]::DoEvents()
+  $form = New-Object Bethesda.Cd.MainForm([Bethesda.Cd.Config]::Read($ini)); Show-Quietly $form
   function Shot([string]$name) {
     if (-not $Shots) { return }
     [Windows.Forms.Application]::DoEvents()

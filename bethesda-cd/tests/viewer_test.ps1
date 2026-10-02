@@ -13,6 +13,7 @@ param([string]$Sources = '')
 $ErrorActionPreference = 'Stop'
 if (-not $Sources) { $Sources = Join-Path $PSScriptRoot '..\src' }
 Add-Type -AssemblyName System.Drawing, System.Windows.Forms
+. (Join-Path $PSScriptRoot 'quiet_window.ps1')
 Add-Type -Path (Get-ChildItem (Join-Path $Sources 'shared'), (Join-Path $Sources 'viewer') -Filter '*.cs' | ForEach-Object { $_.FullName }) -ReferencedAssemblies 'System.Drawing', 'System.Windows.Forms'
 Add-Type -ReferencedAssemblies 'System.Drawing' -TypeDefinition @'
 using System; using System.Collections.Generic; using System.IO; using System.Text; using System.Drawing;
@@ -249,7 +250,7 @@ try {
 
   '6. the window'
   [Bethesda.Viewer.Texts]::Lang = 'fr'
-  $form = New-Object Bethesda.Viewer.MainForm($d); $form.Show(); [Windows.Forms.Application]::DoEvents()
+  $form = New-Object Bethesda.Viewer.MainForm($d); Show-Quietly $form
   Check '  title: the patient; the line that says what the viewer is for; its version in the help' ($form.Text -match 'ESSAI Hélène' -and ($form.Controls | Where-Object { $_.Text -match 'non destinée au diagnostic' }) -and [Bethesda.Viewer.Texts]::Get('helpText') -match [regex]::Escape([Bethesda.Product]::Version))
   Check '  opens on the first series of the most recent exam' ($form.CurrentSeries -eq $st4.Series[0] -and $form.Current.Problem -eq '' -and $form.WindowCenter -eq 2048 -and $form.WindowWidth -eq 4096) $form.CurrentSeries.Label
   $form.StepImage(1); $b0 = $form.CurrentBitmap.GetPixel(30, 20).R; $form.StepImage(-1); $b1 = $form.CurrentBitmap.GetPixel(30, 20).R
