@@ -8,7 +8,8 @@
 #   .\cd-export.ps1 -Lang ko      Korean (-Lang en: English)
 #
 # What is written:  DICOMDIR + IMAGES\ (a standard DICOM disc, made by the image server)
-#                   + README.TXT (whose images, how to read the disc).
+#                   + README.TXT (whose images, how to read the disc)
+#                   + VOIR.EXE (the clinic's small viewer, built from viewer\*.cs).
 # Where:            the disc in the drive / an .iso file / a new folder (a USB stick).
 #
 # It talks to the EMR only - the EMR decides who may copy what (Consultation or Payment),
@@ -22,8 +23,7 @@
 # is made and removed afterwards.
 param(
   [ValidateSet('fr', 'ko', 'en')][string]$Lang = 'fr',
-  [string]$ConfigPath = (Join-Path $PSScriptRoot 'cd-export.ini'),
-  [string]$ViewerDir = (Join-Path $PSScriptRoot 'cd-viewer')   # kept for the clinic's own viewer; nothing is offered until it exists
+  [string]$ConfigPath = (Join-Path $PSScriptRoot 'cd-export.ini')
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'cd-export-common.ps1')
@@ -31,7 +31,7 @@ $ErrorActionPreference = 'Stop'
 
 try {
   [void](Remove-ExportTemp)                              # what an interrupted run left behind
-  $form = New-CdxForm $Lang $ConfigPath $ViewerDir
+  $form = New-CdxForm $Lang $ConfigPath (Get-ViewerSource $PSScriptRoot)
   [void][Windows.Forms.Application]::Run($form)
 } catch {
   # started without a console (cd-export.bat): a failure must still be seen

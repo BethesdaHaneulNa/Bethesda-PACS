@@ -275,7 +275,8 @@ that - double-click it on any PC that reaches the EMR (French; `-Lang ko`, `-Lan
 
 What is written is a standard DICOM disc - `DICOMDIR` and the original files under
 `IMAGES\`, made by Orthanc itself (`/tools/create-media-extended`) - plus `README.TXT`
-(whose images, which exams, how to read the disc; French then English). No JPEG copies.
+(whose images, which exams, how to read the disc; French then English) and `VOIR.EXE` (below).
+No JPEG copies.
 
 - The program talks to **the EMR only**, never to Orthanc: the Orthanc password is not in
   it, and it runs from a reception PC as well as from the server. The EMR checks the
@@ -291,15 +292,20 @@ What is written is a standard DICOM disc - `DICOMDIR` and the original files und
 - A folder or an ISO saved by the program holds a patient's images, unencrypted: delete it
   when it is no longer needed.
 
-**No viewer on the disc, for now.** A hospital reads the disc with its own imaging software.
-Putting the Weasis viewer on the disc was tried and dropped (139 MB on every disc, about 95 MB
-left on the PC that runs it, an English notice to accept); a small viewer of the clinic's own is
-being designed (EMR wiki, `reference/cd-mini-viewer-design.md`). The program keeps the way in - a
-folder `cd-viewer` beside it would go onto the disc as `VIEWER\` - but offers nothing until that
-viewer exists.
+**A small viewer on every disc: `VOIR.EXE`.** A hospital reads the disc with its own imaging
+software; a patient or a small practice has none. So the disc carries the clinic's own viewer -
+about 40 KB, started by a double-click, nothing installed and nothing left on the PC that runs
+it: the exams and series of the disc on the left, the image on the right, window (left drag),
+zoom (Ctrl + wheel), pan (right drag), invert, previous / next. Always in sight: "for
+reference - not for diagnosis". Its source is `viewer\*.cs`; the program builds it into the
+disc with the C# compiler that ships with Windows - no program file is kept in this repository.
+Stage 1: uncompressed images (X-ray films, uncompressed ultrasound stills). JPEG-compressed
+images and ultrasound clips are said to be "not shown here" for now; they come next.
+(Weasis on the disc was tried and dropped: 139 MB on every disc, about 95 MB left on the PC
+that runs it.)
 
 Files: `cd-export.bat` (start), `cd-export.ps1`, `cd-export-ui.ps1` (the window),
-`cd-export-common.ps1` (the work). Needs an EMR that has `GET /api/pacs/export/patient`
+`cd-export-common.ps1` (the work), `viewer\*.cs` (the viewer's source). Needs an EMR that has `GET /api/pacs/export/patient`
 and `/bundle` (EMR after 1.5.0). Details: the EMR wiki, `modules/pacs.md` 2.4.4.
 
 ## Test tools (optional)

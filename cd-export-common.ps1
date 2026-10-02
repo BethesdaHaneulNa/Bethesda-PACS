@@ -11,6 +11,7 @@
 #   DICOMDIR      the standard index, made by the image server
 #   IMAGES\IM0…   the original DICOM files, as the image server holds them
 #   README.TXT    written here: whose images, which exams, how to read the disc
+#   VOIR.EXE      the clinic's small viewer, built here from viewer\*.cs (when they are there)
 # Nothing is installed and no system setting is changed: burning uses Windows' own
 # burning component (IMAPI2), the window is Windows' own (WinForms).
 
@@ -226,8 +227,11 @@ function Write-DiscReadme {
   $L.Add('  IMAGES    les images d''origine')
   $L.Add('Pour les voir : ouvrez ce disque avec votre logiciel d''imagerie (PACS ou')
   $L.Add('visionneuse DICOM), fonction « importer un CD / ouvrir un DICOMDIR ».')
-  # (-WithViewer: the lines that tell how to start the viewer on the disc come back here
-  #  when the clinic's own viewer exists.)
+  if ($WithViewer) {
+    $L.Add('Sans logiciel d''imagerie : double-cliquez sur VOIR.EXE (Windows). C''est une')
+    $L.Add('visionneuse de consultation, non destinée au diagnostic ; elle ne s''installe')
+    $L.Add('pas et ne laisse rien sur l''ordinateur.')
+  }
   $L.Add('Ce disque contient des données médicales personnelles : remettez-le au patient')
   $L.Add('ou au médecin destinataire uniquement.')
   $L.Add('')
@@ -246,44 +250,43 @@ function Write-DiscReadme {
   $L.Add('  IMAGES    the original images')
   $L.Add('To see them: open this disc with your imaging software (PACS or DICOM')
   $L.Add('viewer), "import a CD / open a DICOMDIR".')
+  if ($WithViewer) {
+    $L.Add('Without imaging software: double-click VOIR.EXE (Windows). It is a viewer')
+    $L.Add('for reference, not for diagnosis; it installs nothing and leaves nothing on')
+    $L.Add('the computer.')
+  }
   $L.Add('This disc holds personal medical data: hand it to the patient or to the')
   $L.Add('receiving doctor only.')
   [IO.File]::WriteAllText((Join-Path $Dir 'README.TXT'), (($L -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding($true)))
 }
 
-# ── the viewer (a place kept for it) ─────────────────────────────────────────
-# A hospital reads the disc with its own imaging software; a patient has none. A viewer
-# on the disc was tried with Weasis and dropped (director, 2026-10-02: 139 MB on every
-# disc, about 95 MB left on the PC that runs it, an English notice to accept) - the clinic
-# will have a small viewer of its own (EMR wiki, reference/cd-mini-viewer-design.md).
-# Until it exists nothing is offered: $VIEWER_START names the program in the folder
-# cd-viewer that would start it, and it is empty. What is kept is the way in: a folder
-# beside the program copied onto the disc as VIEWER\, counted in the room needed.
-$VIEWER_START = ''
-function Get-ViewerInfo([string]$ViewerDir) {
-  if (-not $VIEWER_START -or -not $ViewerDir -or -not (Test-Path -LiteralPath (Join-Path $ViewerDir $VIEWER_START) -PathType Leaf)) { return $null }
-  $n = 0; $b = [long]0
-  foreach ($f in [IO.Directory]::GetFiles($ViewerDir, '*', [IO.SearchOption]::AllDirectories)) { $n++; $b += (New-Object IO.FileInfo($f)).Length }
-  return @{ dir = (Resolve-Path -LiteralPath $ViewerDir).Path; files = $n; bytes = $b }
+# ── the viewer on the disc ───────────────────────────────────────────────────
+# A hospital reads the disc with its own imaging software; a patient has none. So every
+# disc carries the clinic's own small viewer, VOIR.EXE: a look at the images, nothing
+# more (EMR wiki, reference/cd-mini-viewer-design.md). Its source is beside this program
+# (viewer\*.cs) and it is built on the spot, by the C# compiler that ships with Windows -
+# no program file is kept in the repository and nothing is installed.
+function Get-ViewerSource([string]$ProgramDir) {
+  $dir = Join-Path $ProgramDir 'viewer'
+  if (-not (Test-Path -LiteralPath $dir -PathType Container)) { return , @() }
+  return , @(Get-ChildItem -LiteralPath $dir -Filter '*.cs' -File | Sort-Object Name | ForEach-Object { $_.FullName })
 }
+# Builds VOIR.EXE into the disc folder. Returns @{ ok; bytes; error }.
 function Add-DiscViewer {
-  param([string]$Dir, [string]$ViewerDir, [scriptblock]$OnFile = $null)
-  $from = (Resolve-Path -LiteralPath $ViewerDir).Path.TrimEnd('\')
-  $to = Join-Path $Dir 'VIEWER'
-  $files = [IO.Directory]::GetFiles($from, '*', [IO.SearchOption]::AllDirectories)
-  $n = 0
-  foreach ($f in $files) {
-    $dest = Join-Path $to $f.Substring($from.Length + 1)
-    $parent = Split-Path -Parent $dest
-    if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
-    [IO.File]::Copy($f, $dest, $true)
-    $n++; if ($OnFile -and ($n % 20 -eq 0 -or $n -eq $files.Count)) { & $OnFile $n $files.Count }
+  param([string]$Dir, [string[]]$Sources)
+  $exe = Join-Path $Dir 'VOIR.EXE'
+  if (-not $Sources -or -not $Sources.Count) { return @{ ok = $false; error = 'no source' } }
+  try {
+    Add-Type -Path $Sources -ReferencedAssemblies 'System.Windows.Forms', 'System.Drawing' -OutputAssembly $exe -OutputType WindowsApplication -ErrorAction Stop
+    if (-not (Test-Path -LiteralPath $exe)) { return @{ ok = $false; error = 'not written' } }
+    return @{ ok = $true; bytes = (Get-Item -LiteralPath $exe).Length }
+  } catch {
+    if (Test-Path -LiteralPath $exe) { Remove-Item -LiteralPath $exe -Force -ErrorAction SilentlyContinue }
+    return @{ ok = $false; error = $_.Exception.Message }
   }
-  return $n
 }
-# The file systems of a disc image: ISO 9660 + Joliet for the DICOM files (what imaging
-# stations read); with the viewer also UDF, which keeps its long names and deep folders.
-function Get-DiscFileSystems([bool]$WithViewer) { if ($WithViewer) { return 7 } else { return 3 } }
+# The file systems of a disc image: ISO 9660 + Joliet - what imaging stations read.
+$DISC_FILE_SYSTEMS = 3
 
 # ── what is in the disc folder ───────────────────────────────────────────────
 # Every file with its size and SHA-256, by its path from the top of the disc.
