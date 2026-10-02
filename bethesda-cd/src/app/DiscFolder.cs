@@ -3,6 +3,7 @@
 //   IMAGES\IM0…   the original DICOM files, as the image server holds them
 //   README.TXT    written here: whose images, which exams, how to read the disc
 //   VIEWER.EXE    the small viewer this program carries inside itself
+//   AUTORUN.INF   written here, when the viewer is on the disc: Windows offers to start it
 // ... and the same content saved to a folder (a USB stick), read back and compared.
 // No window and no question here, so that every step can be run and checked on its own.
 using System;
@@ -171,6 +172,35 @@ namespace Bethesda.Cd {
       } catch (Exception e) {
         try { File.Delete(exe); } catch (Exception) { }
         return new StepResult { Error = e.Message };
+      }
+    }
+
+    // ── AUTORUN.INF ──────────────────────────────────────────────────────────
+    // With this file on a CD or DVD, Windows offers the viewer when the disc is put in
+    // ("Run VIEWER.EXE", in its AutoPlay window) and shows the disc with the viewer's icon;
+    // a double-click on the disc starts the viewer. Nothing starts by itself: Windows asks
+    // first, and where AutoPlay is switched off nothing is offered at all. On a USB stick
+    // Windows ignores the file (it has, since Windows 7) - there the viewer is started by a
+    // double-click on VIEWER.EXE, as README.TXT says.
+    // Written only when the viewer is on the disc: a file that points at a program that is
+    // not there would be an error message for whoever puts the disc in.
+    // Plain ASCII, as Windows reads this file; "action" is the line the AutoPlay window
+    // shows where Windows uses it (French first, then English - no accents).
+    public static readonly string[] AutorunLines = {
+      "[autorun]",
+      "open=VIEWER.EXE",
+      "icon=VIEWER.EXE,0",
+      "action=Voir les images / View the images",
+    };
+    public static bool WriteAutorun(string dir) {
+      string file = Path.Combine(dir, "AUTORUN.INF");
+      try {
+        if (!File.Exists(Path.Combine(dir, "VIEWER.EXE"))) { if (File.Exists(file)) File.Delete(file); return false; }
+        File.WriteAllText(file, string.Join("\r\n", AutorunLines) + "\r\n", Encoding.ASCII);
+        return true;
+      } catch (Exception) {
+        try { File.Delete(file); } catch (Exception) { }        // a disc without it is still a good disc
+        return false;
       }
     }
 

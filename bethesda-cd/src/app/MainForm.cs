@@ -289,6 +289,7 @@ namespace Bethesda.Cd {
           StepResult v = DiscFolder.AddViewer(b.Path);
           if (v.Ok) withViewer = true; else note = Texts.Get("noViewer", v.Error);
         }
+        DiscFolder.WriteAutorun(b.Path);                    // only when the viewer is there; the same folder goes to a folder, an image or a disc
         if (b.Unpacked) note += Texts.Get("unpacked");
         DiscFolder.WriteReadme(b.Path, p, J.Dict(Patient, "clinic"), sel, withViewer, DateTime.Now);
         string label = DiscFolder.DiscLabel(J.Str(p, "chart_no"));

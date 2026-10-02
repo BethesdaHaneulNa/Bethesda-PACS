@@ -78,7 +78,7 @@ $form.add_StatusShown([Action[string, int]] { param($text, $percent) $shown.Add(
 $r = $form.Export('folder', '')
 $top = ''; if ($r.Ok) { $top = (Get-ChildItem $r.Path -Name | Sort-Object) -join ',' }
 Check '  saved, said where, nothing left busy' ($r.Ok -and @(Get-ChildItem (Join-Path $r.Path 'IMAGES')).Count -eq $items -and -not $form.Busy -and $script:said.Count -eq 1 -and $script:said[0] -match [regex]::Escape($r.Path)) "$($r.Path) $($r.Code)"
-Check '  the disc folder: DICOMDIR, IMAGES, README.TXT and the viewer VIEWER.EXE' ($top -eq 'DICOMDIR,IMAGES,README.TXT,VIEWER.EXE' -and ([IO.File]::ReadAllText((Join-Path $r.Path 'README.TXT')) -split 'VIEWER.EXE').Count -eq 3) $top
+Check '  the disc folder: DICOMDIR, IMAGES, README.TXT, the viewer VIEWER.EXE and AUTORUN.INF' ($top -eq 'AUTORUN.INF,DICOMDIR,IMAGES,README.TXT,VIEWER.EXE' -and ([IO.File]::ReadAllText((Join-Path $r.Path 'README.TXT')) -split 'VIEWER.EXE').Count -eq 3) $top
 $built = Join-Path (Split-Path -Parent $Exe) 'VIEWER.EXE'
 if (Test-Path $built) { Check '  the viewer on the disc is byte for byte the one that was built with the program' ((Get-FileHash (Join-Path $r.Path 'VIEWER.EXE')).Hash -eq (Get-FileHash $built).Hash) "$((Get-Item (Join-Path $r.Path 'VIEWER.EXE')).Length) bytes" }
 Check '  while it worked the window said what it was doing' ($shown.Count -ge 3) "$($shown.Count) lines"

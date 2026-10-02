@@ -14,5 +14,8 @@ Bethesda PACS repository, started by `cd-export.bat`).
   frames. Reads uncompressed images, lossless JPEG (decoded by the viewer itself), baseline
   JPEG of 8 bits and RLE. "For reference - not for diagnosis."
 - The viewer is built once and carried inside the program: every disc gets the same file.
+- **AUTORUN.INF** on every disc that carries the viewer: on a CD, Windows shows the disc with
+  the viewer's icon and offers to start the viewer. Nothing starts by itself; on a USB stick
+  Windows ignores the file.
 - Built with the C# compiler that ships with Windows; nothing is installed.
 - Not yet: bringing another hospital's disc INTO the EMR (planned).

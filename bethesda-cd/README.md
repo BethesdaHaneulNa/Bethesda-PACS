@@ -16,6 +16,7 @@ the disc           DICOMDIR      the standard index            \  made by the cl
                    IMAGES\       the original DICOM files      /  server, handed on untouched
                    README.TXT    whose images, which exams, how to read the disc (French, English)
                    VIEWER.EXE    the viewer - double-click
+                   AUTORUN.INF   on a CD: Windows offers to start the viewer (it never starts by itself)
 ```
 
 ## What it needs
@@ -86,6 +87,28 @@ the PC that runs it. The exams and series of the disc on the left, the image on 
 It always shows: **"Visionneuse de consultation — non destinée au diagnostic"** (for
 reference - not for diagnosis).
 
+### AUTORUN.INF
+
+A disc that carries the viewer also carries a four-line `AUTORUN.INF` (`open=VIEWER.EXE`, the
+viewer's icon, and one line of words: "Voir les images / View the images").
+
+- **On a CD or DVD** Windows shows the disc with the viewer's icon, and "Voir les images /
+  View the images" becomes what a double-click on the disc does - it starts `VIEWER.EXE`.
+  "Open" in the right-click menu still shows the files. When the disc is put in, Windows'
+  AutoPlay notice can offer the same.
+- **Nothing starts by itself.** Windows asks first. Where AutoPlay is switched off, or the
+  rules of a hospital's PCs forbid it, nothing is offered: the viewer is then started by a
+  double-click on `VIEWER.EXE`, as `README.TXT` says.
+- **On a USB stick, or in a folder, Windows ignores the file** (it has since Windows 7).
+  There too: double-click `VIEWER.EXE`.
+- A disc on which the viewer could not be put gets no `AUTORUN.INF`.
+
+Checked on Windows 11 with a disc image in a virtual drive: the drive took the viewer's icon;
+its menu began with the line of words; nothing was started when the disc appeared; the disc's
+default action (what a double-click does) started `VIEWER.EXE` from the disc, which showed
+the disc's images; Microsoft Defender found nothing in the disc or in the image. Not checked:
+a burnt disc in a real drive, the AutoPlay notice itself, other antivirus programs.
+
 What it reads: uncompressed images, **lossless JPEG** (decoded by the viewer itself, exactly -
 this is what the clinic's ultrasound machine sends), baseline JPEG of 8 bits (by the decoder
 that is part of Windows) and RLE. Anything else (JPEG 2000, JPEG-LS, 12-bit lossy JPEG) does
@@ -112,7 +135,7 @@ src\viewer\     the viewer:   Program · MainForm · ImagePanel · Disc · Dicom
 src\shared\     Version.cs
 icon\           make-icon.ps1
 install.ps1     install.bat - the program and a desktop shortcut on a PC
-tests\          viewer_test.ps1 · app_test.ps1
+tests\          viewer_test.ps1 · disc_test.ps1 · app_test.ps1
 ```
 
 The program is not signed. Built on the PC that runs it, or brought on a USB stick, Windows
@@ -123,12 +146,16 @@ internet" mark and SmartScreen asks once ("More info" -> "Run anyway").
 
 ```powershell
 .\tests\viewer_test.ps1      # needs nothing: draws its own pictures, encodes them, checks the viewer
+.\tests\disc_test.ps1 -Mount  # needs nothing: the viewer, AUTORUN.INF and README.TXT on a disc folder, a folder copy, a disc image
 .\tests\app_test.ps1 -Emr http://127.0.0.1:9188 -Login someone -Chart 26-00001 -ExamIds 55,56 -Base D:\empty\folder
 ```
 
 `viewer_test.ps1` writes made-up pictures as DICOM in every form the viewer reads (RLE and
 lossless JPEG with each of the seven predictors, by encoders that exist only in the test) and
 checks that every value comes back as it went in; then it drives the viewer's window.
+`disc_test.ps1` puts the viewer, `AUTORUN.INF` and `README.TXT` into a disc folder without
+the EMR, saves it to a folder and to a disc image and - with `-Mount` - puts the image in a
+Windows virtual drive, reads every file back and takes it out again.
 `app_test.ps1` drives the built program against a **test** installation of the EMR (never the
 one the clinic works on): sign-in, the list, a copy to a folder, a disc image, the refusals.
 It burns nothing. The test account's password is taken from the environment variable
