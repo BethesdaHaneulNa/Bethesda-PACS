@@ -1,7 +1,8 @@
 Bethesda CD — License
 
-Copyright (c) 2026 Bethesda EMR project (sponsored by the church
-"행복한 섬김의 열매 / Fruit of Joyful Devotion", for Bethesda Hospital, Madagascar).
+Copyright (c) 2026 Haneul Na.
+Made for Bethesda Hospital, Madagascar, with the support of the church
+"행복한 섬김의 열매 / Fruit of Joyful Devotion".
 
 This license covers the code in this folder: the program Bethesda-CD.exe, the
 viewer VOIR.EXE, their build and test scripts and the docs. They use only what
@@ -21,7 +22,8 @@ You are NOT permitted to:
   2. Remove or misrepresent this notice or the project's origin.
 
 If you would like to use this software in a way the terms above do not cover,
-please contact the project first.
+please ask first: open an issue on the project's GitHub page. Questions are
+welcome there too.
 
 Attribution:
   This software was developed through "vibe coding" with Claude

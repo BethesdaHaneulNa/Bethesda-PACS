@@ -1,7 +1,8 @@
 Bethesda PACS — License
 
-Copyright (c) 2026 Bethesda EMR project (sponsored by the church
-"행복한 섬김의 열매 / Fruit of Joyful Devotion", for Bethesda Hospital, Madagascar).
+Copyright (c) 2026 Haneul Na.
+Made for Bethesda Hospital, Madagascar, with the support of the church
+"행복한 섬김의 열매 / Fruit of Joyful Devotion".
 
 This license covers ONLY the original code in this repository (the worklist
 bridge, the docker-compose configuration, the setup scripts, and the docs).
@@ -23,7 +24,8 @@ You are NOT permitted to:
   2. Remove or misrepresent this notice or the project's origin.
 
 If you would like to use this software in a way the terms above do not cover,
-please contact the project first.
+please ask first: open an issue on the project's GitHub page. Questions are
+welcome there too.
 
 Attribution:
   This software was developed through "vibe coding" with Claude
