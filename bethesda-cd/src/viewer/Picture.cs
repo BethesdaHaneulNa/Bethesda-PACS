@@ -1,4 +1,4 @@
-﻿// VOIR.EXE - one image of the disc: what the file says about it, its pixels, and the
+﻿// VIEWER.EXE - one image of the disc: what the file says about it, its pixels, and the
 // picture drawn from them the way the file asks (grey scale turned over for
 // MONOCHROME1, rescaled, shown through a window of grey levels; colours as RGB, as
 // luminance and chroma, or through the file's own palette).

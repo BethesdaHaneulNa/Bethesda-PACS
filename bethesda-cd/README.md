@@ -2,7 +2,7 @@
 
 A small Windows program for a clinic that runs the **Bethesda EMR**: it copies a patient's
 imaging exams to a CD - or to a disc image, or to a folder on a USB stick - for the patient
-to take to another hospital. Every disc it makes carries a small viewer, **VOIR.EXE**, so
+to take to another hospital. Every disc it makes carries a small viewer, **VIEWER.EXE**, so
 that the images can be looked at on a PC that has no imaging software.
 
 Free, non-profit, made for Bethesda Hospital (Madagascar). French first; Korean and English
@@ -15,7 +15,7 @@ Bethesda-CD.exe    sign in with an EMR account -> chart number -> tick the exams
 the disc           DICOMDIR      the standard index            \  made by the clinic's image
                    IMAGES\       the original DICOM files      /  server, handed on untouched
                    README.TXT    whose images, which exams, how to read the disc (French, English)
-                   VOIR.EXE      the viewer - double-click
+                   VIEWER.EXE    the viewer - double-click
 ```
 
 ## What it needs
@@ -69,7 +69,7 @@ with the last folder used and the language - never a password (see
   when it is no longer needed.
 - `Bethesda-CD.exe -Lang ko` (or `en`) for one run; `lang=ko` in the `.ini` to keep it.
 
-## The viewer, VOIR.EXE
+## The viewer, VIEWER.EXE
 
 About 80 KB, started by a double-click on the disc; it installs nothing and leaves nothing on
 the PC that runs it. The exams and series of the disc on the left, the image on the right.
@@ -95,7 +95,7 @@ server unpack that copy, losslessly, and the program says so. There is no playba
 ## Building it
 
 ```powershell
-.\build.ps1          # -> build\Bethesda-CD.exe  (VOIR.EXE is inside it)
+.\build.ps1          # -> build\Bethesda-CD.exe  (VIEWER.EXE is inside it)
 ```
 
 Only what Windows already has is used: the C# compiler of the .NET Framework (`csc.exe`, C# 5).
@@ -104,7 +104,7 @@ this program (a disc with a cross; drawn for the Bethesda EMR, PACS and CD toget
 sources and how the .ico files are made are in the EMR's wiki). `-IconFile x.ico` builds with
 another; without any icon file one is drawn on the spot by `icon/make-icon.ps1`. The viewer is
 built first and carried inside `Bethesda-CD.exe` as a resource, so every disc gets the very
-same `VOIR.EXE`. The version is written in one place, `src\shared\Version.cs`.
+same `VIEWER.EXE`. The version is written in one place, `src\shared\Version.cs`.
 
 ```
 src\app\        the program:  Program · MainForm · Texts · Emr · DiscFolder · Burner

@@ -9,7 +9,7 @@ Bethesda PACS repository, started by `cd-export.bat`).
   exams, see their size and whether they fit the blank disc in the drive; burn (slowest speed,
   closed disc, read back and compared), or save a disc image, or a folder. French, Korean,
   English. Talks to the EMR only; needs Bethesda EMR 1.5.0 or later.
-- **VOIR.EXE** on every disc: the exams and series of the disc, grey and colour images,
+- **VIEWER.EXE** on every disc: the exams and series of the disc, grey and colour images,
   brightness / contrast / zoom / pan / invert, frame by frame through a file of several
   frames. Reads uncompressed images, lossless JPEG (decoded by the viewer itself), baseline
   JPEG of 8 bits and RLE. "For reference - not for diagnosis."

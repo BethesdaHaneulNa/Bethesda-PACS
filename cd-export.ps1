@@ -9,7 +9,7 @@
 #
 # What is written:  DICOMDIR + IMAGES\ (a standard DICOM disc, made by the image server)
 #                   + README.TXT (whose images, how to read the disc)
-#                   + VOIR.EXE (the clinic's small viewer, built from bethesda-cd\src\viewer).
+#                   + VIEWER.EXE (the clinic's small viewer, built from bethesda-cd\src\viewer).
 #
 # This script is being replaced by Bethesda CD (bethesda-cd\, a real program built by
 # bethesda-cd\build.ps1). It stays for one release, as the way back.

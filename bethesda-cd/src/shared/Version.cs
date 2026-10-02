@@ -1,5 +1,5 @@
 ﻿// Bethesda CD - the one place its name and version are written. Compiled into both
-// programs (Bethesda-CD.exe and the viewer VOIR.EXE): what the window shows, what
+// programs (Bethesda-CD.exe and the viewer VIEWER.EXE): what the window shows, what
 // Windows shows in a file's properties and what CHANGELOG.md says are this number.
 using System.Reflection;
 

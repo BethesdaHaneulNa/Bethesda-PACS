@@ -1,4 +1,4 @@
-﻿// VOIR.EXE - every word the viewer shows, in one place: French (the language of the
+﻿// VIEWER.EXE - every word the viewer shows, in one place: French (the language of the
 // hospitals the disc goes to) when Windows is in French, English otherwise.
 using System.Collections.Generic;
 using System.Globalization;

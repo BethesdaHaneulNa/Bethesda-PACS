@@ -1,4 +1,4 @@
-﻿// VOIR.EXE - the window: the exams and their series on the left, the picture on the
+﻿// VIEWER.EXE - the window: the exams and their series on the left, the picture on the
 // right, a few buttons and, always in sight, the line that says what this viewer is for.
 //
 // It reads the disc and nothing else: no settings are kept, no file is written, nothing

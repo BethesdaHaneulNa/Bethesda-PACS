@@ -261,13 +261,13 @@ succeeded recently. Details: the EMR wiki, `modules/pacs.md` 6.2.
 Hospitals still ask for images on a CD. **Bethesda CD** (`bethesda-cd\`) is a small separate
 program for that: sign in with an EMR account, type the patient's chart number, tick the
 exams, burn - or save a disc image, or a folder on a USB stick. Every disc carries a small
-viewer, `VOIR.EXE`, for those who have no imaging software. It talks to the EMR only (never
+viewer, `VIEWER.EXE`, for those who have no imaging software. It talks to the EMR only (never
 to Orthanc), installs nothing and changes no system setting. Everything about it - what it
 does, what it needs, how the viewer works, how it is tested - is in
 [`bethesda-cd\README.md`](bethesda-cd/README.md).
 
 ```powershell
-.\bethesda-cd\build.ps1        # -> bethesda-cd\build\Bethesda-CD.exe (VOIR.EXE inside it)
+.\bethesda-cd\build.ps1        # -> bethesda-cd\build\Bethesda-CD.exe (VIEWER.EXE inside it)
 ```
 
 The folder `bethesda-cd\` stands on its own (source, build script, icon script, tests, its own

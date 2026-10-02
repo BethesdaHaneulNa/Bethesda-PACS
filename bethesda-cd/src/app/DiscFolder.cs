@@ -2,7 +2,7 @@
 //   DICOMDIR      the standard index, made by the image server
 //   IMAGES\IM0…   the original DICOM files, as the image server holds them
 //   README.TXT    written here: whose images, which exams, how to read the disc
-//   VOIR.EXE      the small viewer this program carries inside itself
+//   VIEWER.EXE    the small viewer this program carries inside itself
 // ... and the same content saved to a folder (a USB stick), read back and compared.
 // No window and no question here, so that every step can be run and checked on its own.
 using System;
@@ -123,9 +123,9 @@ namespace Bethesda.Cd {
       L.Add("Pour les voir : ouvrez ce disque avec votre logiciel d'imagerie (PACS ou");
       L.Add("visionneuse DICOM), fonction « importer un CD / ouvrir un DICOMDIR ».");
       if (withViewer) {
-        L.Add("Sans logiciel d'imagerie : double-cliquez sur VOIR.EXE (Windows). C'est une");
-        L.Add("visionneuse de consultation, non destinée au diagnostic ; elle ne s'installe");
-        L.Add("pas et ne laisse rien sur l'ordinateur.");
+        L.Add("Sans logiciel d'imagerie : double-cliquez sur VIEWER.EXE (Windows). C'est");
+        L.Add("une visionneuse de consultation, non destinée au diagnostic ; elle ne");
+        L.Add("s'installe pas et ne laisse rien sur l'ordinateur.");
       }
       L.Add("Ce disque contient des données médicales personnelles : remettez-le au patient");
       L.Add("ou au médecin destinataire uniquement.");
@@ -146,9 +146,9 @@ namespace Bethesda.Cd {
       L.Add("To see them: open this disc with your imaging software (PACS or DICOM");
       L.Add("viewer), \"import a CD / open a DICOMDIR\".");
       if (withViewer) {
-        L.Add("Without imaging software: double-click VOIR.EXE (Windows). It is a viewer");
-        L.Add("for reference, not for diagnosis; it installs nothing and leaves nothing on");
-        L.Add("the computer.");
+        L.Add("Without imaging software: double-click VIEWER.EXE (Windows). It is a");
+        L.Add("viewer for reference, not for diagnosis; it installs nothing and leaves");
+        L.Add("nothing on the computer.");
       }
       L.Add("This disc holds personal medical data: hand it to the patient or to the");
       L.Add("receiving doctor only.");
@@ -157,13 +157,13 @@ namespace Bethesda.Cd {
 
     // ── the viewer on the disc ───────────────────────────────────────────────
     // A hospital reads the disc with its own imaging software; a patient has none. So every
-    // disc carries the small viewer VOIR.EXE. It is built once, with this program, and
+    // disc carries the small viewer VIEWER.EXE. It is built once, with this program, and
     // carried inside it: every disc gets the very same file.
-    public static bool HasViewer { get { return Assembly.GetExecutingAssembly().GetManifestResourceInfo("VOIR.EXE") != null; } }
+    public static bool HasViewer { get { return Assembly.GetExecutingAssembly().GetManifestResourceInfo("VIEWER.EXE") != null; } }
     public static StepResult AddViewer(string dir) {
-      string exe = Path.Combine(dir, "VOIR.EXE");
+      string exe = Path.Combine(dir, "VIEWER.EXE");
       try {
-        using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("VOIR.EXE")) {
+        using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("VIEWER.EXE")) {
           if (s == null) return new StepResult { Error = "not in this program" };
           using (FileStream f = File.Create(exe)) s.CopyTo(f);
         }
