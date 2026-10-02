@@ -248,6 +248,30 @@ try {
   $st4 = $d.Studies | Where-Object { $_.Date -eq '2026-10-04' }
   Check '  the exams, most recent first; series and images in their own order; accents kept (Latin-1 and UTF-8)' ($d.Studies.Count -eq 4 -and $d.Studies[0].Date -eq '2026-10-04' -and $st4.Series.Count -eq 2 -and $st4.Series[0].Images[0].Number -eq 1 -and $st4.Series[1].Description -eq 'Vésicule biliaire' -and $d.PatientName -eq 'ESSAI Hélène') "$($d.Studies.Count) exams, $($d.ImageCount) images, $($d.PatientName), $($st4.Series[1].Description)"
 
+  '5b. words in other alphabets'
+  function U([int[]]$points) { -join ($points | ForEach-Object { [char]$_ }) }
+  function Dec([byte[]]$bytes, $named, [bool]$guess) { [Bethesda.Viewer.DicomText]::Decode($bytes, $named, $guess) }
+  $latin = [Text.Encoding]::GetEncoding(28591); $kr = [Text.Encoding]::GetEncoding(949); $utf = New-Object Text.UTF8Encoding($false)
+  $fr = (U 0xC9) + 'SSAI^H' + (U 0xE9) + 'l' + (U 0xE8) + 'ne'                  # a French name with accents
+  $given = (U 0xAE38, 0xB3D9); $hong = (U 0xD64D) + '^' + $given                # a Korean name (Hong Gildong), in Hangul
+  $hanja = (U 0x6D2A) + '^' + (U 0x5409, 0x6D1E)                                # the same in ideographs
+  Check '  French in Western European bytes and in UTF-8, named or not: as written' ((Dec ($latin.GetBytes($fr)) $latin $true) -eq $fr -and (Dec ($utf.GetBytes($fr)) $latin $true) -eq $fr -and (Dec ($utf.GetBytes($fr)) $utf $false) -eq $fr)
+  $side = 'CR' + (U 0xC9, 0xC9) + 'E cr' + (U 0xE9, 0xE9) + 'e ' + (U 0xC0, 0xC9) + ' ' + (U 0xE7, 0xE0) + ' ' + (U 0xB0) + 'C'
+  Check '  ... accents side by side are not taken for Korean' ((Dec ($latin.GetBytes($side)) $latin $true) -eq $side)
+  Check '  Korean, the file naming its set' ((Dec ($kr.GetBytes($hong)) $kr $false) -eq $hong)
+  Check '  Korean, the file naming no set - or Western Europe' ((Dec ($kr.GetBytes($hong)) $latin $true) -eq $hong -and (Dec ($kr.GetBytes("NA $hong 01")) $latin $true) -eq "NA $hong 01")
+  Check '  Korean in UTF-8 that the file does not name' ((Dec ($utf.GetBytes($hong)) $latin $true) -eq $hong)
+  $esc = [byte[]](0x1B, 0x24, 0x29, 0x43)                                       # "what follows is Korean"
+  $three = [byte[]]($latin.GetBytes('Hong^Gildong=') + $esc + $kr.GetBytes((U 0x6D2A)) + $latin.GetBytes('^') + $esc + $kr.GetBytes((U 0x5409, 0x6D1E)) + $latin.GetBytes('=') + $esc + $kr.GetBytes((U 0xD64D)) + $latin.GetBytes('^') + $esc + $kr.GetBytes($given))
+  $got = Dec $three $kr $false
+  Check '  a name in three writings with the switches inside it: no stray signs' ($got -eq "Hong^Gildong=$hanja=$hong" -and (Dec $three $latin $true) -eq $got)
+  $local = (U 0xD64D) + ' ' + $given
+  Check '  ... shown with the local writing beside the Latin one; a name in one writing as before' ([Bethesda.Viewer.DicomText]::PersonName($got) -eq "Hong Gildong ($local)" -and [Bethesda.Viewer.DicomText]::PersonName('RAKOTO^Jean^^^') -eq 'RAKOTO Jean' -and [Bethesda.Viewer.DicomText]::PersonName($hong) -eq $local -and [Bethesda.Viewer.DicomText]::PersonName("=$hanja") -eq ((U 0x6D2A) + ' ' + (U 0x5409, 0x6D1E)) -and [Bethesda.Viewer.DicomText]::PersonName('') -eq '')
+  $yamada = (U 0x5C71, 0x7530); $jis = [byte[]]([Text.Encoding]::GetEncoding(51932).GetBytes($yamada) | ForEach-Object { $_ -band 0x7F })
+  $jp = [byte[]]($latin.GetBytes('Yamada^Tarou=') + [byte[]](0x1B, 0x24, 0x42) + $jis + [byte[]](0x1B, 0x28, 0x42) + $latin.GetBytes('^X'))
+  $wang = (U 0x738B, 0x4E94); $gb = [Text.Encoding]::GetEncoding(54936)
+  Check '  Japanese with its switches; Chinese when the file names it' ((Dec $jp ([Text.Encoding]::GetEncoding(932)) $false) -eq "Yamada^Tarou=$yamada^X" -and (Dec ($gb.GetBytes($wang)) $gb $false) -eq $wang)
+
   '6. the window'
   [Bethesda.Viewer.Texts]::Lang = 'fr'
   $form = New-Object Bethesda.Viewer.MainForm($d); Show-Quietly $form

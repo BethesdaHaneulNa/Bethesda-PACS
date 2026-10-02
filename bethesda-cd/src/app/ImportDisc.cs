@@ -48,11 +48,8 @@ namespace Bethesda.Cd {
       ".inf", ".ini", ".cfg", ".config", ".manifest", ".xml", ".json", ".txt", ".htm", ".html", ".css", ".pdf", ".rtf", ".doc", ".docx", ".chm", ".hlp", ".log",
       ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".ico", ".tif", ".tiff", ".zip", ".7z", ".rar", ".cab", ".iso", ".db", ".dat_old" };
 
-    // "RAKOTO^Jean^^^" -> "RAKOTO Jean" (the first of the name's groups).
-    public static string NameShown(string raw) {
-      string s = raw ?? ""; int eq = s.IndexOf('='); if (eq >= 0) s = s.Substring(0, eq);
-      return string.Join(" ", s.Split(new[] { '^' }, StringSplitOptions.RemoveEmptyEntries)).Trim();
-    }
+    // "RAKOTO^Jean^^^" -> "RAKOTO Jean"; a name in two writings -> "Hong Gildong (홍 길동)".
+    public static string NameShown(string raw) { return DicomText.PersonName(raw); }
 
     // The header of one file: null when it is not a DICOM image (no DICM mark, a DICOMDIR, cut short…).
     static DataSet Header(string file) {

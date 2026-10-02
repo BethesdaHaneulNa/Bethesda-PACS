@@ -25,3 +25,8 @@ Bethesda PACS repository, started by `cd-export.bat`).
   one, as they are - with progress, cancel, and nothing left half-way. Only DICOM files are
   read; programs and libraries on the disc are neither opened nor run. An account of the
   registration desk may bring in (and sees only that way).
+- **Names in other alphabets** (the viewer and bringing in): the character set a file names
+  is followed - Korean, Japanese, Chinese, with the switches devices put inside a name - and
+  a Korean name is read even when the file names no set, or names Western Europe, as many
+  devices write it. French accents stay as they are. A name written twice is shown as
+  "Hong Gildong (홍 길동)".
