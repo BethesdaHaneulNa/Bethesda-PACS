@@ -1,0 +1,72 @@
+Bethesda PACS
+Copyright (C) 2026 Haneul Na and Bethesda PACS contributors
+
+This program is free software: you can redistribute it and/or modify it under the terms
+of the GNU General Public License as published by the Free Software Foundation,
+version 3 (GPL-3.0-only). It is distributed WITHOUT ANY WARRANTY; see LICENSE.
+
+This file lists the third-party software this repository uses. The offline install kit
+(container images, built and shipped by the Bethesda EMR project) is covered by the EMR's
+offline/THIRD-PARTY-NOTICE.md, which lists the PACS images too.
+
+-------------------------------------------------------------------------------
+1. Worklist bridge (bridge/Dockerfile, image bethesda-pacs-worklist-bridge)
+-------------------------------------------------------------------------------
+
+Installed with pip into the official python:3.12-slim image (Debian based):
+
+  Package              Version            Licence
+  pydicom              2.4.4 (pinned)     MIT-style (pydicom licence)
+  requests             2.32.3 (pinned)    Apache-2.0
+    certifi            as pip resolves    MPL-2.0 (file-level copyleft; used unmodified)
+    urllib3            as pip resolves    MIT
+    idna               as pip resolves    BSD-3-Clause
+    charset-normalizer as pip resolves    MIT
+
+  Python               3.12               PSF License (in the base image)
+  Debian packages      base image         many GPL/LGPL packages (bash, coreutils, glibc ...)
+
+All of them are compatible with GPL-3.0. Only pydicom and requests are pinned; their own
+dependencies are the versions pip picks when the image is built.
+
+Test scripts only (bridge/q_test.py, bridge/storetest.py, not in the image, installed by
+hand when needed):
+
+  pynetdicom           any                MIT-style
+
+-------------------------------------------------------------------------------
+2. Orthanc
+-------------------------------------------------------------------------------
+
+The image server is Orthanc, a separate program by other authors: core GPL-3.0-or-later;
+the DICOMweb, Stone Web Viewer and Orthanc Explorer 2 plugins AGPL-3.0-or-later; the
+worklists plugin GPL-3.0-or-later. docker-compose.yml runs the unmodified official image
+orthancteam/orthanc (tag pinned there; 26.9.1 at the time of writing) and configures it with
+environment variables. The bridge, the scripts and Bethesda EMR talk to it only over its
+REST API, the DICOM protocol and the worklist folder. No Orthanc code is in this
+repository, linked into it or derived from it.
+
+This repository does not distribute Orthanc: Docker pulls it from Docker Hub. Whoever
+distributes the image (for example in an offline install kit) must meet the GPL/AGPL terms
+for it, including the offer of its corresponding source:
+  https://orthanc.uclouvain.be/downloads/          (Orthanc source releases)
+  https://github.com/orthanc-team/orthanc-builder  (how the Docker image is built)
+
+-------------------------------------------------------------------------------
+3. Bethesda CD (bethesda-cd/)
+-------------------------------------------------------------------------------
+
+Bethesda-CD.exe and VIEWER.EXE are compiled with the C# compiler of the .NET Framework 4.8
+(csc.exe) and reference only Windows system components: System.Windows.Forms,
+System.Drawing, System.IO.Compression, System.Web.Extensions, Microsoft.CSharp and the
+IMAPI2 burning service (COM). These are System Libraries in the sense of GPLv3 section 1.
+No NuGet package or other third-party library is used. The viewer's lossless JPEG and RLE
+decoders are written for this project from the public standards (ITU-T T.81, DICOM PS3.5).
+
+-------------------------------------------------------------------------------
+4. Other files
+-------------------------------------------------------------------------------
+
+The icons (bethesda-pacs.ico, bethesda-cd/icon/Bethesda-CD.ico, drawn by
+bethesda-cd/icon/make-icon.ps1) are the project's own. The Windows scripts use only
+PowerShell 5.1 and Windows. No fonts or third-party images are included.

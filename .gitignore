@@ -1,0 +1,32 @@
+# Secrets and machine-local settings (setup writes .env; never commit it)
+.env
+.env.*
+!.env.example
+*.bak
+
+# The clinic's images and the worklist files the bridge writes
+storage/
+worklists/
+*.dcm
+
+__pycache__/
+
+# Development tools and their worktrees
+.claude/
+worktrees/
+
+# Offline install kit (built by the EMR project's offline/pack.ps1) - multi-GB
+# image tarballs, and it bundles GPL/AGPL third-party images. Never commit it.
+bethesda-offline-kit/
+*.tar
+
+# image-backup.ps1 run log and last-run status (no patient data, but local to
+# this machine)
+logs/
+
+# cd-export: the EMR address of this machine
+cd-export.ini
+
+# Bethesda CD: what build.ps1 makes, and the settings of this machine
+bethesda-cd/build/
+Bethesda-CD.ini

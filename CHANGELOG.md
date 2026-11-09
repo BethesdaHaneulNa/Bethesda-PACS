@@ -1,0 +1,178 @@
+# Changelog
+
+## v1.2.2 — 2026-11-09
+
+**Public release preparation.** Bethesda PACS is now free software under the GNU GPL
+version 3 (GPL-3.0-only): `LICENSE` holds the full text (and `bethesda-cd/LICENSE` the same),
+`NOTICE` lists the third-party software, and `CONTRIBUTING.md` says how to run and test it.
+The README says what the project is, that it holds no clinic data, and how Orthanc is used:
+its core is GPL-3.0-or-later and the DICOMweb, Stone Web Viewer and Orthanc Explorer 2 plugins
+AGPL-3.0-or-later; it runs unmodified from the official image, and the offline install kit,
+which carries that image, comes with the source offer (GPLv3 section 6).
+
+- **No default Orthanc password.** `docker-compose.yml` takes `ORTHANC_PASSWORD` from `.env`
+  only; without it `docker compose` refuses to start instead of running with a password
+  printed in this repository. `setup` has always written one on the first run, so an
+  installed PACS starts as before. If an `.env` has none, `setup` (and so `start.bat` and the
+  offline update) now adds a random one and pairs it with the EMR.
+- **Called AE Title and name from `.env`**: `ORTHANC_AET` (default `MEDCONNECT`, as before -
+  devices need no change) and `PACS_NAME` (default `Bethesda PACS`). `device-watch.ps1` and
+  the test scripts `q_test.py` / `storetest.py` follow `ORTHANC_AET`. `.env.example` lists
+  every setting.
+- **Bethesda CD 1.0.1**: README.TXT on a disc with the viewer says, in French and English,
+  that VIEWER.EXE is free software under GPL-3.0, where its source is, and that it has no
+  warranty. The same line in the older `cd-export` scripts.
+- Example addresses in docs and messages are `10.0.0.x`; site-specific device names and
+  internal document references are gone from comments and the changelog.
+- README: the DICOM port assumes a trusted clinic LAN (any device may query and send) -
+  never expose 4242 beyond it.
+
+**After updating:** nothing to do on an installed PACS. `docker compose up -d` (or
+`start.bat`) recreates the containers with the same settings. To have the new disc text,
+build Bethesda CD again (`bethesda-cd\build.ps1`) or take the built folder from the kit.
+
+## v1.2.1 — 2026-11-07
+
+**Worklist for devices that key Modality at the top level.** A bone densitometer in use
+sends its Modality in both the step and at the top of the query.
+The bridge wrote it only in the step, and Orthanc counts a keyed tag the file lacks as a
+mismatch, so that device saw an empty list unless its Modality was left blank. `write_wl`
+now writes Modality at the top level too, the same value. Devices that key only the step,
+or send it empty, see no change. Bridge only: `docker compose up -d --build worklist-bridge`.
+
+## v1.2.0 — 2026-10-06
+
+Goes with **Bethesda EMR v1.6.0**: the two change together, and an EMR at 1.6.0 expects
+this PACS.
+
+**Bethesda CD 1.0.0.** A program of its own in `bethesda-cd\` (a real `.exe`, with its
+icon and desktop shortcuts, and a way onto a reception PC): it copies a patient's exams
+to a CD, a disc image or a folder, burnt at the slowest speed with the check shown, and
+puts the clinic's own small viewer on every disc - `VIEWER.EXE` (uncompressed, JPEG and
+RLE images; brightness and contrast on colour pictures too; a drag that does not
+stutter) with an `AUTORUN.INF`. Korean names on a disc are read as written. The same
+program brings a disc or a USB stick from another hospital in: by chart number, without an
+order, after a question that says how many images; the EMR shows them as outside images.
+Weasis is not used.
+
+**Orthanc 1.13.0** (`orthancteam/orthanc:26.9.1`). Upgrade and go back were tried on an
+isolated stack first; the storage from before the upgrade is kept beside the new one.
+
+**Images put under another order.** When the EMR moves or exchanges a study, the image
+backup sets the old files aside, and a restore that brings the old study back has the
+correction applied again by the EMR itself.
+
+**Smaller.** The bridge's heartbeat says how much room is left where the images are
+stored; `device-watch` says what the imaging devices are doing in plain words and shows
+only device warnings; unknown image types are accepted; setup says when another program
+answers on the EMR's port; the administration shortcut is named "Bethesda PACS
+(administration)". LICENSE names the holder; questions go to the GitHub issues.
+
+**After updating:** recreate the PACS from this folder after the EMR has been updated to
+1.6.0 (`docker compose up -d`); nothing in `.env` changes. Build Bethesda CD once on a PC
+with Python (`bethesda-cd\build.ps1`) or take the built folder from the kit.
+
+## v1.1.0 — 2026-09-30
+
+- **Orthanc 1.13.0** (image `orthancteam/orthanc:26.9.1`, was 26.6.1 = 1.12.11). Tried first on the isolated stack: the storage folder opens unchanged and can be opened again by 1.12.11; worklist, arrival, import, export, move, backup and restore pass. 1.13.0 refuses a device whose AE title holds a backslash, a tab or a control character. The offline kit needs the new image.
+
+Goes with **[Bethesda EMR v1.5.0](https://github.com/BethesdaHaneulNa/Bethesda-EMR/releases/tag/v1.5.0)**:
+the two change together, and an EMR at 1.5.0 expects this PACS. The EMR's changelog
+(section *Imaging (PACS)*) tells the whole story from the doctor's side; this is the PACS
+folder's part of it.
+
+**The images can live on a drive of their own.** `ORTHANC_STORAGE_PATH` in `.env` names the
+folder (setup asks at the first installation; not set = `storage\` here, as before), and
+`move-image-storage.ps1` moves an existing store there: stop, copy, compare, start, check
+that the image server holds what it held, keep the old folder under another name. The
+store carries a marker file and the image server does not start on a folder that has
+neither the marker nor an image index - when the store's disk is missing, Docker Desktop
+makes an empty folder of that name, and an image server started on it would look healthy
+and hold nothing. The bridge reports the free room of the store's own disk, and the backup
+scripts refuse (or report) a backup disk that is the same physical disk as the images.
+
+**The worklist feed no longer answers to the published token.** The bridge token had a
+default, `change-me-bridge-token`, published in this repository and accepted by the EMR:
+any EMR never paired with a PACS handed today's imaging patients to anyone who knew that
+string. The bridge now sends the token in a header instead of the URL, and `setup`
+generates a random token and a random Orthanc password on first run. **`pair-with-emr.ps1`**
+(and `.sh`) pairs the PACS with the EMR on the same machine through standard input and
+compares by hash — the values never appear on screen, on a command line or in a log.
+`setup` runs it by itself when the EMR is already up. Run it again after every restore of
+an EMR backup.
+
+**The EMR knows when the images have arrived.** Every cycle the bridge asks Orthanc whether
+each scheduled study has arrived and settled, and tells the EMR, which marks the order done
+and drops it from the device worklist — a patient no longer stays on the device list all
+day after being imaged. When a device ignores the study number it was given, the bridge
+finds the study by the order's accession number and reports the device's real one. A bridge
+that cannot ask Orthanc says so in its heartbeat, and the EMR's status turns yellow instead
+of staying green.
+
+**Doctors see images without an Orthanc login.** The EMR relays the Stone viewer itself, so
+Orthanc's web port now listens only on the server PC (`127.0.0.1:9090`); devices keep
+sending to 4242 on the network. Stone's "Intended use" box is turned off (after closing it
+the image area stayed black until the window was resized).
+
+**Images and the EMR's backups go to an external disk every night.** `prepare-backup-disk.ps1`
+marks a USB disk; `install-image-backup.ps1` registers a 02:30 task (run it on the clinic's
+server PC, not on the PC the kit was prepared on); `image-backup.ps1` copies the images new
+since the last run as plain DICOM files, then the EMR's own database backups, each checked
+by hash and as a complete gzip and kept by the EMR's rule (30 days, never fewer than the
+newest seven). A disk carried to another server, or an Orthanc refilled from the backup, is
+recognised and nothing is skipped. A disk pulled during a run is reported as such and the
+next run continues. `restore-image-backup.ps1` puts the images back and checks every EMR
+imaging order against Orthanc; `-Verify` checks the disk without writing. Each run reports
+counts and free space to the EMR (no patient data); the disk is not encrypted and holds the
+whole EMR database, so it must be kept locked away.
+
+**Smaller.** `check-windows-ports.ps1` warns when Windows has reserved 9090 or 4242, which
+made a healthy-looking PACS unreachable. An isolated PACS stack (`docker-compose.session.yml`,
+9198 / 11298) for testing beside a running one. Test tools no longer contain an old Orthanc
+password or real-looking patient details.
+
+**After updating:** recreate the PACS from this folder after the EMR has been updated; run
+`pair-with-emr.ps1`; remove any firewall rule that opened 9090 to other PCs; set up the
+image backup disk; and if the Windows dynamic port range starts near 1024, set it back to
+49152 (`check-windows-ports.ps1` says how).
+
+## v1.0.2 — 2026-07-24
+
+**Can be installed with no internet.** The worklist bridge image now has a name
+of its own (`bethesda-pacs-worklist-bridge`) instead of relying on the one
+Compose invents, which is what lets `docker save` pick it up — and `setup`
+learned an `-Offline` / `--offline` flag that starts from pre-loaded images
+without building. Orthanc is a 2 GB pull, so a clinic on a slow link had little
+chance of installing imaging at all.
+
+Pack it alongside the EMR with that project's `offline/pack.ps1`; see
+**[Bethesda EMR v1.3.0](https://github.com/BethesdaHaneulNa/Bethesda-EMR/releases/tag/v1.3.0)**
+and its `OFFLINE-INSTALL.md`.
+
+## v1.0.1 — 2026-07-23
+
+**The bridge now says it is still there.** It could stop or wedge and the only
+trace was a line in a container log; on the device it simply looks like the
+patients were never scheduled, and there is nobody on site to connect the two.
+
+After every cycle it writes a timestamp the container healthcheck reads — which
+keeps working when the EMR is unreachable, exactly when we want to know whether
+this process is alive — and posts the same news to the EMR, which puts it on a
+screen the clinic already looks at. Neither can interrupt the sync loop; a failed
+report is swallowed, because the EMR being down is already its own alarm.
+
+Orthanc gained a healthcheck too. It asks the REST API rather than trusting the
+process to be running; `/system` needs a login, so a 401 is a good answer here —
+it proves the server is listening and serving.
+
+Pair with **[Bethesda EMR v1.2.0](https://github.com/BethesdaHaneulNa/Bethesda-EMR/releases/tag/v1.2.0)**
+or newer, which shows all of this in a status window on the clinic's machine.
+
+## v1.0.0 — 2026-07-23
+
+First tagged release. Modality worklist bridge + Orthanc for Bethesda EMR.
+
+One unconvertible order no longer empties the whole worklist: the sync loop had
+no per-row guard, so an order that could not be turned into a worklist file
+aborted the entire cycle and every patient after it in the list silently lost
+their entry.

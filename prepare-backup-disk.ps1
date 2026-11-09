@@ -1,0 +1,48 @@
+# Make an external disk the PACS image backup disk (run once per disk).
+#
+# Writes the marker file image-backup.ps1 looks for, so the disk is found
+# whatever drive letter Windows gives it. Refuses a disk that already holds
+# other files unless -Force, so the wrong disk is not picked by mistake.
+#
+#   .\prepare-backup-disk.ps1 -Target E:\
+#   .\prepare-backup-disk.ps1 -Target E:\ -Force
+param(
+  [Parameter(Mandatory = $true)][string]$Target,
+  [switch]$Force
+)
+$ErrorActionPreference = 'Continue'
+. (Join-Path $PSScriptRoot 'image-backup-common.ps1')
+. (Join-Path $PSScriptRoot 'image-storage-common.ps1')
+
+if (-not (Test-Path $Target)) { Write-Host "No such drive or folder: $Target"; exit 1 }
+$root = (Resolve-Path $Target).Path
+if ($root -match '^[A-Za-z]:\\?$' -and $root.Substring(0, 1).ToUpper() -eq $env:SystemDrive.Substring(0, 1).ToUpper()) {
+  Write-Host "$root is the system disk. Use an external disk."; exit 1
+}
+# Nor the disk the images themselves are on (the image store may be on a drive of its own:
+# ORTHANC_STORAGE_PATH in .env). Two partitions of one disk are one disk.
+$store = Get-ImageStoragePath $PSScriptRoot (Join-Path $PSScriptRoot '.env')
+if ((Test-SamePhysicalDisk $root $store) -eq $true) {
+  Write-Host "$root is on the same physical disk as the image store ($store): a backup there is lost together with the images. Use another disk."; exit 1
+}
+if (Test-Path (Join-Path $root $MarkerName)) { Write-Host "$root is already a PACS backup disk - nothing to do."; exit 0 }
+
+$others = @(Get-ChildItem -Force $root -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -notin @('System Volume Information', '$RECYCLE.BIN') })
+if ($others.Count -gt 0 -and -not $Force) {
+  Write-Host "$root is not empty ($($others.Count) items). If this really is the disk for PACS image backups, run again with -Force."
+  exit 1
+}
+
+New-Item -ItemType Directory -Force -Path (Join-Path $root "$BackupDirName\images") | Out-Null
+$marker = @(
+  'Bethesda PACS image backup disk',
+  # Parenthesised: inside @( ) the comma binds before +, so without them 'disk_id=' and
+  # the GUID landed on two separate lines (Bethesda, 2026-11-08). Nothing reads disk_id yet.
+  ('disk_id=' + [guid]::NewGuid().ToString()),
+  ('created=' + (Get-Date -Format 'yyyy-MM-dd HH:mm')),
+  'Do not delete this file: the nightly backup finds this disk by it.'
+)
+Set-Content -Path (Join-Path $root $MarkerName) -Value $marker -Encoding ascii -ErrorAction Stop
+Write-Host "Ready: $root is now the PACS image backup disk."
+exit 0
